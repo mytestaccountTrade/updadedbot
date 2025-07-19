@@ -187,7 +187,12 @@ class BinanceService {
       
       return { totalWalletBalance: totalBalance };
     } catch (error) {
-      console.error('Failed to get account info:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('API credentials not configured')) {
+        console.warn('API credentials not configured - using simulation mode');
+      } else {
+        console.error('Failed to get account info:', error);
+      }
       return null;
     }
   }
