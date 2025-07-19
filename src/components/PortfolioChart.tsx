@@ -24,7 +24,7 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({ portfolio }) => 
       const value = trend + volatility;
       
       data.push({
-        date: date.toLocaleDateString(),
+        date: date.toISOString().split('T')[0], // YYYY-MM-DD format
         value: Math.max(value, baseValue * 0.8),
         timestamp: date.getTime(),
       });
@@ -45,8 +45,13 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({ portfolio }) => 
             stroke="#666"
             fontSize={12}
             tickFormatter={(value) => {
-              const date = new Date(value);
-              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              try {
+                const date = new Date(value);
+                if (isNaN(date.getTime())) return value;
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              } catch (error) {
+                return value;
+              }
             }}
           />
           <YAxis 
@@ -56,7 +61,15 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({ portfolio }) => 
           />
           <Tooltip 
             formatter={(value: number) => [`$${value.toFixed(2)}`, 'Portfolio Value']}
-            labelFormatter={(label) => `Date: ${label}`}
+            labelFormatter={(label) => {
+              try {
+                const date = new Date(label);
+                if (isNaN(date.getTime())) return `Date: ${label}`;
+                return `Date: ${date.toLocaleDateString()}`;
+              } catch (error) {
+                return `Date: ${label}`;
+              }
+            }}
             contentStyle={{
               backgroundColor: '#fff',
               border: '1px solid #e5e7eb',

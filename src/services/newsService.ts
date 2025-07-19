@@ -1,7 +1,8 @@
 import { NewsItem } from '../types/trading';
 
 class NewsService {
-  private newsData: NewsItem[] = [];
+  private cachedNews: NewsItem[] = [];
+  private lastFetchTime: number = 0;
   private llama3Url: string = 'http://localhost:11434'; // Default Ollama URL
   private llama3Model: string = 'llama3';
 
@@ -11,46 +12,53 @@ class NewsService {
   }
 
   async fetchCryptoNews(): Promise<NewsItem[]> {
-    try {
-      // Simulated news data - in production, integrate with real news APIs
-      const mockNews: NewsItem[] = [
-        {
-          id: '1',
-          title: 'Bitcoin Reaches New All-Time High',
-          content: 'Bitcoin has surged to unprecedented levels following institutional adoption...',
-          source: 'CoinDesk',
-          timestamp: Date.now() - 3600000,
-          sentiment: 'BULLISH',
-          impact: 8.5,
-          coins: ['BTC', 'ETH'],
-        },
-        {
-          id: '2',
-          title: 'Ethereum Upgrade Reduces Gas Fees',
-          content: 'The latest Ethereum upgrade has significantly reduced transaction costs...',
-          source: 'CoinTelegraph',
-          timestamp: Date.now() - 7200000,
-          sentiment: 'BULLISH',
-          impact: 7.2,
-          coins: ['ETH'],
-        },
-        {
-          id: '3',
-          title: 'Regulatory Concerns Impact Market',
-          content: 'New regulatory proposals have created uncertainty in the crypto market...',
-          source: 'Bloomberg',
-          timestamp: Date.now() - 10800000,
-          sentiment: 'BEARISH',
-          impact: 6.8,
-          coins: ['BTC', 'ETH', 'ADA'],
-        },
-      ];
+    const now = Date.now();
 
-      this.newsData = mockNews;
-      return mockNews;
+    // 🔒 6 saatlik rate limit (21600000 ms)
+    const FETCH_INTERVAL = 6 * 60 * 60 * 1000;
+
+    if (now - this.lastFetchTime < FETCH_INTERVAL && this.cachedNews.length > 0) {
+      console.log('🕒 Using cached news data.');
+      return this.cachedNews;
+    }
+
+    try {
+      const apiKey = 'pub_9f9d4c2af53a4f4ea5c6647ce7cbc06d';
+      const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=bitcoin OR ethereum OR crypto&language=en&category=business`;
+
+      const response = await fetch(url);
+
+      if (response.status === 429) {
+        console.warn('❗ Rate limit reached. Using cached data.');
+        return this.cachedNews;
+      }
+
+      const json = await response.json();
+
+      if (!json.results || !Array.isArray(json.results)) {
+        console.warn('❌ Invalid news data received.');
+        return this.cachedNews;
+      }
+
+      const news: NewsItem[] = json.results.map((item: any, index: number) => ({
+        id: item.link || `news-${index}`,
+        title: item.title || 'Untitled',
+        content: item.description || item.title || 'No content',
+        source: item.source_id || 'Unknown',
+        timestamp: new Date(item.pubDate || '').getTime() || Date.now(),
+        sentiment: 'NEUTRAL',
+        impact: Math.random() * 10,
+        coins: this.extractCoinsFromText(`${item.title} ${item.description}`),
+      }));
+
+      this.cachedNews = news;
+      this.lastFetchTime = now;
+
+      console.log('✅ News fetched and cached.');
+      return news;
     } catch (error) {
       console.error('Failed to fetch crypto news:', error);
-      return [];
+      return this.cachedNews;
     }
   }
 
@@ -215,7 +223,25 @@ Generate a trading signal. Respond with only: BUY, SELL, or HOLD followed by con
   }
 
   getLatestNews(): NewsItem[] {
-    return this.newsData;
+    return this.cachedNews;
+  }
+
+  private extractCoinsFromText(text: string): string[] {
+    const coins = ['BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'LINK', 'MATIC', 'AVAX', 'UNI', 'LTC'];
+    const foundCoins: string[] = [];
+    const upperText = text.toUpperCase();
+    
+    coins.forEach(coin => {
+      if (upperText.includes(coin) || upperText.includes(coin.toLowerCase())) {
+        foundCoins.push(coin);
+      }
+    });
+    
+    // Add Bitcoin and Ethereum variations
+    if (upperText.includes('BITCOIN')) foundCoins.push('BTC');
+    if (upperText.includes('ETHEREUM')) foundCoins.push('ETH');
+    
+    return [...new Set(foundCoins)]; // Remove duplicates
   }
 }
 

@@ -71,11 +71,27 @@ class TradingBot {
     return this.portfolio;
   }
 
+  async updateRealWalletBalance() {
+    if (this.config.mode === 'REAL') {
+      const accountInfo = await binanceService.getAccountInfo();
+      if (accountInfo) {
+        this.portfolio.totalValue = accountInfo.totalWalletBalance;
+        this.portfolio.availableBalance = accountInfo.totalWalletBalance;
+        console.log(`Real wallet balance updated: $${accountInfo.totalWalletBalance.toFixed(2)}`);
+      }
+    }
+  }
+
   start() {
     if (this.isRunning) return;
     
     this.isRunning = true;
     console.log(`Trading bot started in ${this.config.mode} mode`);
+    
+    // Update real wallet balance if in real mode
+    if (this.config.mode === 'REAL') {
+      this.updateRealWalletBalance();
+    }
     
     // Run trading loop every 30 seconds
     this.intervalId = setInterval(() => {
@@ -269,6 +285,20 @@ class TradingBot {
 
   async openShortPosition(symbol: string, amount: number) {
     return await this.sellAsset(symbol, amount);
+  }
+
+  async closePosition(positionId: string) {
+    const position = this.portfolio.positions.find(p => p.id === positionId);
+    if (!position) return false;
+
+    const marketData = await binanceService.getMarketData(position.symbol);
+    if (!marketData) return false;
+
+    position.currentPrice = marketData.price;
+    position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
+    
+    await this.closePosition(position, 'MANUAL_CLOSE');
+    return true;
   }
 }
 

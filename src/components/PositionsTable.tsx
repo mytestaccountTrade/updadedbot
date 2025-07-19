@@ -1,15 +1,24 @@
 import React from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, X } from 'lucide-react';
 import { Position } from '../types/trading';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '../contexts/LanguageContext';
+import { tradingBot } from '../services/tradingBot';
 
 interface PositionsTableProps {
   positions: Position[];
+  onPositionClosed?: () => void;
 }
 
-export const PositionsTable: React.FC<PositionsTableProps> = ({ positions }) => {
+export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onPositionClosed }) => {
   const { t } = useLanguage();
+
+  const handleClosePosition = async (positionId: string) => {
+    const success = await tradingBot.closePosition(positionId);
+    if (success && onPositionClosed) {
+      onPositionClosed();
+    }
+  };
 
   if (positions.length === 0) {
     return (
@@ -32,6 +41,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions }) => 
             <th className="text-left py-3 px-4 font-medium text-gray-600">P&L</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">P&L %</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('age')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -67,6 +77,15 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions }) => 
               </td>
               <td className="py-4 px-4 text-gray-500 text-sm">
                 {formatDistanceToNow(new Date(position.timestamp), { addSuffix: true })}
+              </td>
+              <td className="py-4 px-4">
+                <button
+                  onClick={() => handleClosePosition(position.id)}
+                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                  title="Close Position"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </td>
             </tr>
           ))}

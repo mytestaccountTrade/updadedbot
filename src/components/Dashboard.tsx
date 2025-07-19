@@ -30,6 +30,11 @@ export const Dashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      // Update real wallet balance if in real mode
+      if (tradingBot.getConfig().mode === 'REAL') {
+        await tradingBot.updateRealWalletBalance();
+      }
+      
       const [pairs, newsData] = await Promise.all([
         binanceService.getTradingPairs(),
         newsService.fetchCryptoNews()
@@ -232,6 +237,7 @@ export const Dashboard: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('activePositions')}</h3>
                 <PositionsTable positions={portfolio.positions} />
+                <PositionsTable positions={portfolio.positions} onPositionClosed={fetchData} />
               </div>
             )}
             

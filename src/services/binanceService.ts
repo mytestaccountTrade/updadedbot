@@ -157,6 +157,51 @@ class BinanceService {
     }
   }
 
+  async getAccountInfo(): Promise<{ totalWalletBalance: number } | null> {
+    try {
+      if (!this.hasValidCredentials()) {
+        throw new Error('API credentials not configured');
+      }
+
+      const data = await this.makeRequest('/api/v3/account');
+      
+      let totalBalance = 0;
+      if (data.balances) {
+        for (const balance of data.balances) {
+          if (parseFloat(balance.free) > 0 || parseFloat(balance.locked) > 0) {
+            const total = parseFloat(balance.free) + parseFloat(balance.locked);
+            
+            // Convert to USDT value (simplified - in production, you'd get current prices)
+            if (balance.asset === 'USDT') {
+              totalBalance += total;
+            } else if (balance.asset === 'BTC') {
+              const btcPrice = await this.getCurrentPrice('BTCUSDT');
+              totalBalance += total * btcPrice;
+            } else if (balance.asset === 'ETH') {
+              const ethPrice = await this.getCurrentPrice('ETHUSDT');
+              totalBalance += total * ethPrice;
+            }
+          }
+        }
+      }
+      
+      return { totalWalletBalance: totalBalance };
+    } catch (error) {
+      console.error('Failed to get account info:', error);
+      return null;
+    }
+  }
+
+  private async getCurrentPrice(symbol: string): Promise<number> {
+    try {
+      const ticker = await this.makeRequest('/api/v3/ticker/price', { symbol });
+      return parseFloat(ticker.price);
+    } catch (error) {
+      console.error(`Failed to get price for ${symbol}:`, error);
+      return 0;
+    }
+  }
+
   private calculateRSI(prices: number[]): number {
     if (prices.length < 14) return 50;
     
