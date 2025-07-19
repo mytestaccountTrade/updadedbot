@@ -272,7 +272,6 @@ export const Dashboard: React.FC = () => {
             {activeTab === 'positions' && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('activePositions')}</h3>
-                <PositionsTable positions={portfolio.positions} />
                 <PositionsTable positions={portfolio.positions} onPositionClosed={fetchData} />
               </div>
             )}

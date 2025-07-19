@@ -136,6 +136,8 @@ class TradingBot {
       // Update existing positions
       await this.updatePositions();
       
+      console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
+      
       // Look for new trading opportunities - check more pairs for better opportunities
       for (const pair of tradingPairs.slice(0, 20)) {
         if (this.portfolio.positions.length >= this.config.maxPositions) break;
@@ -153,6 +155,7 @@ class TradingBot {
         
         // More aggressive entry - lower confidence threshold
         if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.6) {
+          console.log(`🎯 Trading signal: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
           await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
         }
       }
@@ -175,22 +178,43 @@ class TradingBot {
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
       // More aggressive exit conditions
-      const shouldExit = 
-        position.pnlPercent <= -this.config.stopLossPercent * 100 || // Stop loss
-        position.pnlPercent >= this.config.takeProfitPercent * 100 || // Take profit
-        await this.shouldExitBasedOnLearning(position, marketData); // Learning-based exit
+      let shouldExit = false;
+      let exitReason = '';
+      
+      // Check stop loss
+      if (position.pnlPercent <= -this.config.stopLossPercent * 100) {
+        shouldExit = true;
+        exitReason = 'STOP_LOSS';
+      }
+      // Check take profit
+      else if (position.pnlPercent >= this.config.takeProfitPercent * 100) {
+        shouldExit = true;
+        exitReason = 'TAKE_PROFIT';
+      }
+      // Check learning-based exit
+      else {
+        const learningExit = await this.shouldExitBasedOnLearning(position, marketData);
+        if (learningExit) {
+          shouldExit = true;
+          exitReason = 'LEARNING_EXIT';
+        }
+      }
       
       if (shouldExit) {
-        const reason = position.pnlPercent <= -this.config.stopLossPercent * 100 ? 'STOP_LOSS' :
-                      position.pnlPercent >= this.config.takeProfitPercent * 100 ? 'TAKE_PROFIT' : 'LEARNING_EXIT';
-        await this.closePosition(position, reason);
+        console.log(`🔄 Closing position ${position.symbol} - Reason: ${exitReason}, P&L: ${position.pnlPercent.toFixed(2)}%`);
+        await this.closePositionInternal(position, exitReason);
       }
     }
   }
 
   private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
-    const exitSignal = await learningService.shouldExit(position, marketData);
-    return exitSignal.shouldExit && exitSignal.confidence > 0.7;
+    try {
+      const exitSignal = await learningService.shouldExit(position, marketData);
+      return exitSignal.shouldExit && exitSignal.confidence > 0.7;
+    } catch (error) {
+      console.error('Learning-based exit analysis failed:', error);
+      return false;
+    }
   }
 
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any) {
@@ -263,7 +287,7 @@ class TradingBot {
     console.log(`${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at ${marketData.price}`);
   }
 
-  private async closePosition(position: Position, reason: string) {
+  private async closePositionInternal(position: Position, reason: string) {
     const closeTradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const trade: Trade = {
@@ -284,7 +308,10 @@ class TradingBot {
         position.side === 'LONG' ? 'SELL' : 'BUY',
         position.size
       );
-      if (!realTrade) return;
+      if (!realTrade) {
+        console.error(`❌ Failed to execute real trade for closing position ${position.symbol}`);
+        return false;
+      }
       
       trade.id = realTrade.id;
       trade.price = realTrade.price;
@@ -302,6 +329,7 @@ class TradingBot {
     this.activePositionIds.delete(position.symbol);
     
     console.log(`Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
+    return true;
   }
 
   private updatePortfolioMetrics() {
@@ -349,8 +377,7 @@ class TradingBot {
     position.currentPrice = marketData.price;
     position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
     
-    await this.closePosition(position, 'MANUAL_CLOSE');
-    return true;
+    return await this.closePositionInternal(position, 'MANUAL_CLOSE');
   }
 }
 
