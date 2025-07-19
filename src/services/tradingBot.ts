@@ -222,8 +222,8 @@ class TradingBot {
     const tradeContext = {
       marketData,
       signal,
-      newsContext: await newsService.getLatestNews().then(news => 
-        news.filter(item => item.coins.includes(symbol.replace('USDT', '')))
+      newsContext: newsService.getLatestNews().filter(item => 
+        item.coins.includes(symbol.replace('USDT', ''))
       ),
       portfolioState: { ...this.portfolio }
     };
