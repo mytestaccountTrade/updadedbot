@@ -1,21 +1,23 @@
 import { BotConfig, Portfolio, Position, Trade, MarketData } from '../types/trading';
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
+import { learningService } from './learningService';
 
 class TradingBot {
   private config: BotConfig;
   private portfolio: Portfolio;
   private isRunning: boolean = false;
   private intervalId: NodeJS.Timeout | null = null;
+  private activePositionIds: Set<string> = new Set();
 
   constructor() {
     this.config = {
       mode: 'SIMULATION',
       simulationBalance: 10000,
-      maxRiskPerTrade: 0.02, // 2% of portfolio per trade
-      stopLossPercent: 0.05, // 5% stop loss
-      takeProfitPercent: 0.10, // 10% take profit
-      maxPositions: 5,
+      maxRiskPerTrade: 0.05, // 5% of portfolio per trade - more aggressive
+      stopLossPercent: 0.03, // 3% stop loss - tighter for faster exits
+      takeProfitPercent: 0.06, // 6% take profit - lower target for faster profits
+      maxPositions: 8, // More positions for more opportunities
       enableNewsTrading: true,
       enableTechnicalAnalysis: true,
     };
@@ -60,6 +62,10 @@ class TradingBot {
         config.llama3Url || 'http://localhost:11434',
         config.llama3Model || 'llama3'
       );
+      learningService.setLlama3Config(
+        config.llama3Url || 'http://localhost:11434',
+        config.llama3Model || 'llama3'
+      );
     }
   }
 
@@ -93,10 +99,10 @@ class TradingBot {
       this.updateRealWalletBalance();
     }
     
-    // Run trading loop every 30 seconds
+    // Run trading loop every 10 seconds for faster execution
     this.intervalId = setInterval(() => {
       this.runTradingLoop();
-    }, 30000);
+    }, 10000);
     
     // Run initial loop
     this.runTradingLoop();
@@ -120,6 +126,9 @@ class TradingBot {
 
   private async runTradingLoop() {
     try {
+      // Get learning insights before making decisions
+      const learningInsights = await learningService.getMarketInsights();
+      
       // Fetch market data
       const tradingPairs = await binanceService.getTradingPairs();
       const news = await newsService.fetchCryptoNews();
@@ -127,17 +136,24 @@ class TradingBot {
       // Update existing positions
       await this.updatePositions();
       
-      // Look for new trading opportunities
-      for (const pair of tradingPairs.slice(0, 10)) {
+      // Look for new trading opportunities - check more pairs for better opportunities
+      for (const pair of tradingPairs.slice(0, 20)) {
         if (this.portfolio.positions.length >= this.config.maxPositions) break;
+        
+        // Skip if we already have a position in this symbol
+        if (this.activePositionIds.has(pair.symbol)) continue;
         
         const marketData = await binanceService.getMarketData(pair.symbol);
         if (!marketData) continue;
         
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         
-        if (signal.action !== 'HOLD' && signal.confidence > 0.7) {
-          await this.executeTrade(pair.symbol, signal.action, marketData);
+        // Apply learning insights to improve decision making
+        const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+        
+        // More aggressive entry - lower confidence threshold
+        if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.6) {
+          await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
         }
       }
       
@@ -158,25 +174,41 @@ class TradingBot {
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
-      // Check for stop loss or take profit
-      const pnlPercent = Math.abs(position.pnlPercent);
+      // More aggressive exit conditions
+      const shouldExit = 
+        position.pnlPercent <= -this.config.stopLossPercent * 100 || // Stop loss
+        position.pnlPercent >= this.config.takeProfitPercent * 100 || // Take profit
+        await this.shouldExitBasedOnLearning(position, marketData); // Learning-based exit
       
-      if (position.pnlPercent <= -this.config.stopLossPercent * 100) {
-        await this.closePosition(position, 'STOP_LOSS');
-      } else if (position.pnlPercent >= this.config.takeProfitPercent * 100) {
-        await this.closePosition(position, 'TAKE_PROFIT');
+      if (shouldExit) {
+        const reason = position.pnlPercent <= -this.config.stopLossPercent * 100 ? 'STOP_LOSS' :
+                      position.pnlPercent >= this.config.takeProfitPercent * 100 ? 'TAKE_PROFIT' : 'LEARNING_EXIT';
+        await this.closePosition(position, reason);
       }
     }
   }
 
-  private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData) {
+  private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
+    const exitSignal = await learningService.shouldExit(position, marketData);
+    return exitSignal.shouldExit && exitSignal.confidence > 0.7;
+  }
+
+  private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any) {
+    // Prevent duplicate positions
+    if (this.activePositionIds.has(symbol)) {
+      return;
+    }
+    
     const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade;
     const quantity = riskAmount / marketData.price;
     
     if (quantity * marketData.price > this.portfolio.availableBalance) return;
     
+    // Generate unique trade ID
+    const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const trade: Trade = {
-      id: Date.now().toString(),
+      id: tradeId,
       symbol,
       side: action,
       type: 'MARKET',
@@ -184,6 +216,16 @@ class TradingBot {
       price: marketData.price,
       status: 'FILLED',
       timestamp: Date.now(),
+    };
+    
+    // Store trade context for learning
+    const tradeContext = {
+      marketData,
+      signal,
+      newsContext: await newsService.getLatestNews().then(news => 
+        news.filter(item => item.coins.includes(symbol.replace('USDT', '')))
+      ),
+      portfolioState: { ...this.portfolio }
     };
     
     if (this.config.mode === 'REAL') {
@@ -200,7 +242,7 @@ class TradingBot {
     
     // Create position
     const position: Position = {
-      id: trade.id,
+      id: tradeId,
       symbol,
       side: action === 'BUY' ? 'LONG' : 'SHORT',
       size: quantity,
@@ -212,14 +254,20 @@ class TradingBot {
     };
     
     this.portfolio.positions.push(position);
+    this.activePositionIds.add(symbol);
+    
+    // Record trade for learning
+    await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
     console.log(`${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at ${marketData.price}`);
   }
 
   private async closePosition(position: Position, reason: string) {
+    const closeTradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const trade: Trade = {
-      id: Date.now().toString(),
+      id: closeTradeId,
       symbol: position.symbol,
       side: position.side === 'LONG' ? 'SELL' : 'BUY',
       type: 'MARKET',
@@ -246,8 +294,12 @@ class TradingBot {
     this.portfolio.trades.push(trade);
     this.portfolio.availableBalance += position.size * position.currentPrice;
     
+    // Record position close for learning
+    await learningService.recordPositionClose(position, trade, reason);
+    
     // Remove position
     this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
+    this.activePositionIds.delete(position.symbol);
     
     console.log(`Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
   }

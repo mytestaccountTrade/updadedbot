@@ -11,6 +11,7 @@ import { PositionsTable } from './PositionsTable';
 import { TradesHistory } from './TradesHistory';
 import { BotSettings } from './BotSettings';
 import { useLanguage } from '../contexts/LanguageContext';
+import { learningService } from '../services/learningService';
 
 export const Dashboard: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -19,13 +20,19 @@ export const Dashboard: React.FC = () => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [learningStats, setLearningStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   useEffect(() => {
     fetchData();
+    updateLearningStats();
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
+    return () => {
+      clearInterval(interval);
+      clearInterval(learningInterval);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -46,6 +53,11 @@ export const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch data:', error);
     }
+  };
+
+  const updateLearningStats = () => {
+    const stats = learningService.getLearningStats();
+    setLearningStats(stats);
   };
 
   const handleStartStop = () => {
@@ -229,6 +241,30 @@ export const Dashboard: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('topTradingPairs')}</h3>
                   <TradingPairsList pairs={tradingPairs.slice(0, 10)} onTradeExecuted={fetchData} />
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'overview' && learningStats && (
+              <div className="mt-6 bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-2">🧠 AI Learning Status</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-600">Total Trades:</span>
+                    <div className="font-medium">{learningStats.totalTrades}</div>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Win Rate:</span>
+                    <div className="font-medium">{learningStats.winRate}%</div>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Avg Profit:</span>
+                    <div className="font-medium">{learningStats.avgProfit}%</div>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Last Update:</span>
+                    <div className="font-medium text-xs">{learningStats.lastLearningUpdate}</div>
+                  </div>
                 </div>
               </div>
             )}
