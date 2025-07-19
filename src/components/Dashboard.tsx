@@ -228,7 +228,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('topTradingPairs')}</h3>
-                  <TradingPairsList pairs={tradingPairs.slice(0, 10)} />
+                  <TradingPairsList pairs={tradingPairs.slice(0, 10)} onTradeExecuted={fetchData} />
                 </div>
               </div>
             )}
