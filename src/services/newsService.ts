@@ -467,7 +467,7 @@ Respond with: ACTION CONFIDENCE REASONING`;
     }
   }
 
-  private async processLlama3RequestQueue(): void {
+  private async processLlama3RequestQueue(): Promise<void> {
     if (this.llama3RequestQueue.length > 0 && this.activeLlama3Requests < this.maxConcurrentLlama3Requests) {
       const nextRequest = this.llama3RequestQueue.shift();
       if (nextRequest) {
