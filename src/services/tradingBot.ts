@@ -682,6 +682,7 @@ class TradingBot {
       // Both TP1 and TP2 hit, check TP3 for final exit
       if ((isLong && currentPrice >= exitLevels.tp3) || (!isLong && currentPrice <= exitLevels.tp3)) {
         return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
+      }
       
       // Update trailing stop if price moves favorably
       const trailDistance = isLong ? 0.015 : -0.015; // 1.5% trail
@@ -700,16 +701,8 @@ class TradingBot {
 
   private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
     try {
-      // Enhanced learning-based exit with market regime context
-      const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
       const exitSignal = await learningService.shouldExit(position, marketData);
-      
-      // Adjust confidence threshold based on market condition
-      let confidenceThreshold = 0.7;
-      if (marketCondition.type === 'HIGH_VOLATILITY') confidenceThreshold = 0.6;
-      if (marketCondition.type === 'UNCERTAIN') confidenceThreshold = 0.5;
-      
-      return exitSignal.shouldExit && exitSignal.confidence > confidenceThreshold;
+      return exitSignal.shouldExit && exitSignal.confidence > 0.7;
     } catch (error) {
       console.error('Learning-based exit analysis failed:', error);
       return false;
@@ -723,22 +716,13 @@ class TradingBot {
       return;
     }
     
-    // Enhanced entry validation with market regime context
-    const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
-    const entryValidation = this.validateTradeEntry(symbol, action, marketData, marketCondition, signal);
-    if (!entryValidation.valid) {
-      console.log(`🚫 Entry blocked for ${symbol}: ${entryValidation.reason}`);
-      return;
-    }
-    
     // Apply adaptive risk sizing
     const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
     const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
     const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
     const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
-    const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
     
-    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
+    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier;
     const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
     const quantity = riskAmount / marketData.price;
     
@@ -771,7 +755,6 @@ class TradingBot {
     const tradeContext = {
       marketData,
       signal,
-      marketCondition,
       newsContext: newsService.getLatestNews().filter(item => 
         item.coins.includes(symbol.replace('USDT', ''))
       ),
@@ -806,8 +789,8 @@ class TradingBot {
     this.portfolio.positions.push(position);
     this.activePositionIds.add(symbol);
     
-    // Set up multi-exit levels with market regime adjustments
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side, marketCondition);
+    // Set up multi-exit levels
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side);
     this.multiExitPositions.set(position.id, {
       tp1Hit: false,
       tp2Hit: false,
@@ -818,78 +801,7 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
-    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
-    console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
-    console.log(`   🎯 Exits: TP1=${exitLevels.tp1.toFixed(2)}, TP2=${exitLevels.tp2.toFixed(2)}, TP3=${exitLevels.tp3.toFixed(2)}, SL=${exitLevels.sl.toFixed(2)}`);
-  }
-
-  private validateTradeEntry(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, marketCondition: any, signal?: any): { valid: boolean; reason: string } {
-    const { rsi, macd, volumeRatio, emaTrend } = marketData;
-    
-    // Check for conflicting signals
-    let conflictCount = 0;
-    let totalSignals = 0;
-    
-    // RSI vs Action conflict
-    if (rsi > 70 && action === 'BUY') conflictCount++;
-    if (rsi < 30 && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // MACD vs Action conflict
-    if (macd < 0 && action === 'BUY') conflictCount++;
-    if (macd > 0 && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // EMA Trend vs Action conflict
-    if (emaTrend === 'BEARISH' && action === 'BUY') conflictCount++;
-    if (emaTrend === 'BULLISH' && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // Too many conflicts
-    if (conflictCount >= 2) {
-      return { valid: false, reason: 'CONFLICTING_INDICATORS' };
-    }
-    
-    // Low volume validation
-    if (volumeRatio < 0.5) {
-      return { valid: false, reason: 'LOW_VOLUME' };
-    }
-    
-    // Market condition validation
-    if (marketCondition.type === 'UNCERTAIN' && marketCondition.confidence < 0.3) {
-      return { valid: false, reason: 'UNCERTAIN_MARKET' };
-    }
-    
-    // Time-based validation
-    const hour = new Date().getUTCHours();
-    const isLowLiquidityTime = hour >= 22 || hour < 6; // Overnight
-    
-    if (isLowLiquidityTime && marketCondition.type === 'HIGH_VOLATILITY') {
-      return { valid: false, reason: 'HIGH_VOLATILITY_OVERNIGHT' };
-    }
-    
-    // Signal confidence validation
-    if (signal && signal.confidence < 0.4) {
-      return { valid: false, reason: 'LOW_SIGNAL_CONFIDENCE' };
-    }
-    
-    return { valid: true, reason: 'ENTRY_VALIDATED' };
-  }
-
-  private getMarketRiskMultiplier(marketCondition: any): number {
-    switch (marketCondition.type) {
-      case 'HIGH_VOLATILITY':
-        return 0.6; // Reduce risk in high volatility
-      case 'UNCERTAIN':
-        return 0.7; // Reduce risk in uncertain conditions
-      case 'TRENDING_UP':
-      case 'TRENDING_DOWN':
-        return 1.1; // Slightly increase risk in trending markets
-      case 'SIDEWAYS':
-        return 0.9; // Slightly reduce risk in sideways markets
-      default:
-        return 1.0;
-    }
+    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%)`);
   }
 
   private async closePositionInternal(position: Position, reason: string) {
@@ -976,7 +888,6 @@ class TradingBot {
       console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${positionsValue.toFixed(2)}, Invested: $${investedCapital.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
     }
   }
-  
 
   // Manual trading methods
   async buyAsset(symbol: string, amount: number) {
