@@ -35,12 +35,11 @@ class BinanceService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   
-  // Cached trading pairs for throttling
+  // Enhanced caching and throttling for trading pairs
   private cachedTradingPairs: TradingPair[] = [];
-  
-  // Throttling and rate limiting
   private lastTradingPairsFetch: number = 0;
-  private tradingPairsThrottle: number = 30000; // 30 seconds
+  private tradingPairsThrottle: number = 10000; // 10 seconds as requested
+  
   private lastMarketDataFetch: Map<string, number> = new Map();
   private marketDataThrottle: number = 5000; // 5 seconds per symbol
   private wsMessageThrottle: Map<string, number> = new Map();
@@ -147,37 +146,74 @@ class BinanceService {
       finalQueryString = `${queryString}&signature=${signature}`;
     }
     
-    try {
-      const response = await fetch(`${url}?${finalQueryString}`, {
-        method,
-        headers: {
-          ...(requiresAuth && { 'X-MBX-APIKEY': this.apiKey }),
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Binance API error: ${response.statusText} - ${errorText}`);
+    // Retry mechanism with exponential backoff
+    const maxRetries = 3;
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Add delay for retries (exponential backoff)
+        if (attempt > 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
+          console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for ${endpoint} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        const response = await fetch(`${url}?${finalQueryString}`, {
+          method,
+          headers: {
+            ...(requiresAuth && { 'X-MBX-APIKEY': this.apiKey }),
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          
+          // Log first 200 characters of HTML response for debugging
+          const preview = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+          console.warn(`⚠️ Binance API ${response.status} ${response.statusText} for ${endpoint}:`);
+          console.warn(`Response preview: ${preview}`);
+          
+          // For 403 errors, continue to retry
+          if (response.status === 403 && attempt < maxRetries) {
+            lastError = new Error(`Binance API error: ${response.statusText} - ${preview}`);
+            continue;
+          }
+          
+          throw new Error(`Binance API error: ${response.statusText} - ${preview}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        lastError = error as Error;
+        
+        // Don't retry on network errors for the last attempt
+        if (attempt === maxRetries) {
+          console.error(`❌ Final attempt failed for ${endpoint}:`, error);
+          throw lastError;
+        }
+        
+        console.warn(`⚠️ Attempt ${attempt} failed for ${endpoint}:`, error instanceof Error ? error.message : error);
       }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Binance API request failed:', error);
-      throw error;
     }
+    
+    throw lastError!;
   }
 
   async getTradingPairs(): Promise<TradingPair[]> {
-    // Throttle trading pairs fetch to prevent excessive API calls
+    // Enhanced throttling - only fetch once every 10 seconds
     const now = Date.now();
     if (now - this.lastTradingPairsFetch < this.tradingPairsThrottle) {
-      console.log('🕒 Trading pairs fetch throttled, using cached data');
+      console.log(`🕒 Trading pairs fetch throttled (${Math.ceil((this.tradingPairsThrottle - (now - this.lastTradingPairsFetch)) / 1000)}s remaining), using cached data`);
       return this.getCachedTradingPairs();
     }
 
     try {
       this.lastTradingPairsFetch = now;
+      console.log('📊 Fetching fresh trading pairs from Binance API...');
+      
       const data = await this.makeRequest('/api/v3/ticker/24hr');
       const pairs = data
         .filter((ticker: any) => ticker.symbol.endsWith('USDT') && this.isValidSymbol(ticker.symbol))
@@ -193,12 +229,13 @@ class BinanceService {
       
       // Cache the successful result
       this.cachedTradingPairs = pairs;
+      console.log(`✅ Successfully fetched ${pairs.length} trading pairs`);
       return pairs;
     } catch (error) {
-      console.error('Failed to fetch trading pairs:', error);
+      console.error('❌ Failed to fetch trading pairs after all retries:', error);
       
       // Return mock data for development/testing when API fails
-      console.log('🔄 Using fallback mock trading pairs data');
+      console.log('🔄 Falling back to mock trading pairs data');
       return this.getMockTradingPairs();
     }
   }
