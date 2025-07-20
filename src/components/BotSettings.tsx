@@ -379,6 +379,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

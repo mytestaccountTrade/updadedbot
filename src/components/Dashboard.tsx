@@ -25,7 +25,6 @@ export const Dashboard: React.FC = () => {
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const [showResetToast, setShowResetToast] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -83,22 +82,6 @@ export const Dashboard: React.FC = () => {
       tradingBot.start();
     }
     setIsRunning(!isRunning);
-  };
-
-  const handleResetAILearning = async () => {
-    try {
-      const success = tradingBot.resetAILearning();
-      if (success) {
-        // Update stats immediately after reset
-        updateLearningStats();
-        
-        // Show success toast
-        setShowResetToast(true);
-        setTimeout(() => setShowResetToast(false), 3000);
-      }
-    } catch (error) {
-      console.error('Failed to reset AI learning:', error);
-    }
   };
 
   const config = tradingBot.getConfig();
