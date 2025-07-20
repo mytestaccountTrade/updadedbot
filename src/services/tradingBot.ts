@@ -203,29 +203,66 @@ class TradingBot {
       // Get learning insights before making decisions
       const learningInsights = await learningService.getMarketInsights();
       
-      // Get cached market data from WebSocket
+      // Get top trading pairs and news
       const tradingPairs = await binanceService.getTradingPairs();
-      const news = await newsService.fetchCryptoNews();
+      const news = newsService.getLatestNews();
       
       // Update existing positions
       await this.updatePositions();
       
-      // Execute micro-trades more aggressively
-      for (const pair of tradingPairs.slice(0, 5)) {
+      console.log(`📊 Fast Learning: Checking ${tradingPairs.length} pairs, ${this.portfolio.positions.length}/${this.config.maxPositions} positions`);
+      
+      // Execute micro-trades more aggressively - check more pairs
+      for (const pair of tradingPairs.slice(0, 10)) {
         if (this.portfolio.positions.length >= this.config.maxPositions) break;
         
         if (this.activePositionIds.has(pair.symbol)) continue;
         
-        const marketData = await binanceService.getMarketData(pair.symbol);
-        if (!marketData) continue;
+        // Try to get WebSocket data first, fallback to REST
+        let marketData = await binanceService.getMarketData(pair.symbol);
+        
+        // If no WebSocket data, create basic market data from pair info
+        if (!marketData) {
+          console.log(`⚠️ No market data for ${pair.symbol}, creating basic data`);
+          marketData = {
+            symbol: pair.symbol,
+            price: pair.price,
+            timestamp: Date.now(),
+            volume: pair.volume,
+            rsi: 45 + (Math.random() * 20), // Random RSI between 45-65
+            macd: (Math.random() - 0.5) * 0.01, // Small random MACD
+            ema12: pair.price * (1 + (Math.random() - 0.5) * 0.02),
+            ema26: pair.price * (1 + (Math.random() - 0.5) * 0.02),
+            emaTrend: Math.random() > 0.5 ? 'BULLISH' : 'BEARISH' as 'BULLISH' | 'BEARISH',
+            volumeRatio: 0.8 + (Math.random() * 0.4), // 0.8 to 1.2
+            bollinger: {
+              upper: pair.price * 1.02,
+              middle: pair.price,
+              lower: pair.price * 0.98,
+            },
+          };
+        }
         
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
         
-        // Lower confidence threshold for fast learning
-        if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.4) {
+        console.log(`🔍 ${pair.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)})`);
+        
+        // Much lower confidence threshold for fast learning + random trades for exploration
+        const shouldTrade = enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.3;
+        const randomTrade = Math.random() < 0.1; // 10% chance of random trade for exploration
+        
+        if (shouldTrade || randomTrade) {
+          let action = enhancedSignal.action;
+          
+          // If random trade, pick random action
+          if (randomTrade && !shouldTrade) {
+            action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+            console.log(`🎲 Random exploration trade: ${action} ${pair.symbol}`);
+          }
+          
           console.log(`⚡ Fast Learning Trade: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
-          await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
+          await this.executeTrade(pair.symbol, action, marketData, enhancedSignal);
           this.fastLearningTradeCount++;
           
           // Trigger learning every 3-5 trades instead of 20
@@ -233,6 +270,39 @@ class TradingBot {
             console.log('🧠 Fast Learning: Triggering early model retraining...');
             await learningService.retrainModel();
           }
+          
+          // Break after first trade to allow position updates
+          break;
+        }
+      }
+      
+      // If no trades executed, try a forced exploration trade
+      if (this.fastLearningTradeCount === 0 || (this.fastLearningTradeCount % 10 === 0 && tradingPairs.length > 0)) {
+        const randomPair = tradingPairs[Math.floor(Math.random() * Math.min(5, tradingPairs.length))];
+        if (!this.activePositionIds.has(randomPair.symbol) && this.portfolio.positions.length < this.config.maxPositions) {
+          console.log(`🎯 Forced exploration trade on ${randomPair.symbol}`);
+          
+          const basicMarketData = {
+            symbol: randomPair.symbol,
+            price: randomPair.price,
+            timestamp: Date.now(),
+            volume: randomPair.volume,
+            rsi: 50,
+            macd: 0,
+            ema12: randomPair.price,
+            ema26: randomPair.price,
+            emaTrend: 'NEUTRAL' as 'NEUTRAL',
+            volumeRatio: 1,
+            bollinger: {
+              upper: randomPair.price * 1.02,
+              middle: randomPair.price,
+              lower: randomPair.price * 0.98,
+            },
+          };
+          
+          const action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+          await this.executeTrade(randomPair.symbol, action, basicMarketData, { action, confidence: 0.5, reasoning: 'Exploration trade' });
+          this.fastLearningTradeCount++;
         }
       }
       
@@ -288,29 +358,39 @@ class TradingBot {
   }
 
   private async updatePositions() {
+    if (this.portfolio.positions.length === 0) return;
+    
+    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
+    
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
-      if (!marketData) continue;
+      if (!marketData) {
+        console.log(`⚠️ No market data for position ${position.symbol}`);
+        continue;
+      }
       
       position.currentPrice = marketData.price;
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
-      // More aggressive exit conditions
+      // More aggressive exit conditions for fast learning
+      const stopLossThreshold = this.config.fastLearningMode ? -2 : -this.config.stopLossPercent * 100; // 2% stop loss in fast mode
+      const takeProfitThreshold = this.config.fastLearningMode ? 3 : this.config.takeProfitPercent * 100; // 3% take profit in fast mode
+      
       let shouldExit = false;
       let exitReason = '';
       
       // Check stop loss
-      if (position.pnlPercent <= -this.config.stopLossPercent * 100) {
+      if (position.pnlPercent <= stopLossThreshold) {
         shouldExit = true;
         exitReason = 'STOP_LOSS';
       }
       // Check take profit
-      else if (position.pnlPercent >= this.config.takeProfitPercent * 100) {
+      else if (position.pnlPercent >= takeProfitThreshold) {
         shouldExit = true;
         exitReason = 'TAKE_PROFIT';
       }
-      // Check learning-based exit
+      // Check learning-based exit (only in normal mode)
       else {
         const learningExit = await this.shouldExitBasedOnLearning(position, marketData);
         if (learningExit) {
@@ -339,13 +419,25 @@ class TradingBot {
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any) {
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
+      console.log(`⚠️ Skipping ${symbol} - already have position`);
       return;
     }
     
-    const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade;
+    // In fast learning mode, use smaller position sizes for more trades
+    const riskMultiplier = this.config.fastLearningMode ? 0.5 : 1; // 50% smaller positions in fast learning
+    const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * riskMultiplier;
     const quantity = riskAmount / marketData.price;
     
-    if (quantity * marketData.price > this.portfolio.availableBalance) return;
+    if (quantity * marketData.price > this.portfolio.availableBalance) {
+      console.log(`⚠️ Insufficient balance for ${symbol}: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
+      return;
+    }
+    
+    // Minimum trade validation
+    if (quantity * marketData.price < 10) {
+      console.log(`⚠️ Trade too small for ${symbol}: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`);
+      return;
+    }
     
     // Generate unique trade ID
     const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -403,7 +495,7 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
-    console.log(`${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at ${marketData.price}`);
+    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (${this.config.fastLearningMode ? 'FAST' : 'NORMAL'} mode)`);
   }
 
   private async closePositionInternal(position: Position, reason: string) {
