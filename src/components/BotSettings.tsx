@@ -15,7 +15,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
   const [formData, setFormData] = useState<BotConfig>(config);
   const [showResetToast, setShowResetToast] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [resetType, setResetType] = useState<'ai' | 'all'>('ai');</parameter>
+  const [resetType, setResetType] = useState<'ai' | 'all'>('ai');
 
   const handleSave = () => {
     // Log changes
