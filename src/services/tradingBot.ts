@@ -3,6 +3,7 @@ import { OpenPosition, TradeCooldown } from '../types/trading';
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
+import { learningService } from './learningService';
 
 class TradingBot {
   private config: BotConfig;
@@ -137,12 +138,17 @@ class TradingBot {
       // Get learning insights before making decisions
       const learningInsights = await learningService.getMarketInsights();
       
+      // Get learning insights before making decisions
+      const learningInsights = await learningService.getMarketInsights();
+      
       // Fetch market data
       const tradingPairs = await binanceService.getTradingPairs();
       const news = await newsService.fetchCryptoNews();
       
       // Update existing positions
       await this.updatePositions();
+      
+      console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
       
       console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
       
@@ -156,6 +162,7 @@ class TradingBot {
         // Check cooldown and backoff mechanisms
         if (this.isSymbolOnCooldown(pair.symbol)) {
           console.log(`⏰ Symbol ${pair.symbol} is on cooldown, skipping`);
+          console.log(`⏰ Symbol ${pair.symbol} is on cooldown, skipping`);
           continue;
         }
         
@@ -166,6 +173,9 @@ class TradingBot {
         
         // Check for position conflicts and apply dynamic trade style
         const enhancedSignal = this.enhanceSignalWithPositionAwareness(signal, pair.symbol, marketData);
+        
+        // Apply learning insights to improve decision making
+        const finalSignal = await learningService.enhanceSignal(enhancedSignal, marketData, learningInsights);
         
         // Apply learning insights to improve decision making
         const finalSignal = await learningService.enhanceSignal(enhancedSignal, marketData, learningInsights);
@@ -212,30 +222,11 @@ class TradingBot {
       }
       // Check learning-based exit
       else {
-        const learningExit = await this.shouldExitBasedOnLearning(position, marketData);
-        if (learningExit) {
+        const learningExitSignal = await learningService.shouldExit(position, marketData);
+        if (learningExitSignal.shouldExit && learningExitSignal.confidence > 0.7) {
           shouldExit = true;
-          exitReason = 'LEARNING_EXIT';
+          exitReason = `LEARNING_EXIT: ${learningExitSignal.reason}`;
         }
-      }
-      
-      if (shouldExit) {
-        console.log(`🔄 Closing position ${position.symbol} - Reason: ${exitReason}, P&L: ${position.pnlPercent.toFixed(2)}%`);
-        await this.closePositionInternal(position, exitReason);
-      }
-    }
-  }
-
-  private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
-    try {
-      const exitSignal = await learningService.shouldExit(position, marketData);
-      return exitSignal.shouldExit && exitSignal.confidence > 0.7;
-    } catch (error) {
-      console.error('Learning-based exit analysis failed:', error);
-      return false;
-    }
-  }
-
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any) {
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
@@ -259,6 +250,16 @@ class TradingBot {
       price: marketData.price,
       status: 'FILLED',
       timestamp: Date.now(),
+    };
+    
+    // Store trade context for learning
+    const tradeContext = {
+      marketData,
+      signal,
+      newsContext: newsService.getLatestNews().filter(item => 
+        item.coins.includes(symbol.replace('USDT', ''))
+      ),
+      portfolioState: { ...this.portfolio }
     };
     
     // Store trade context for learning
@@ -299,6 +300,8 @@ class TradingBot {
     this.portfolio.positions.push(position);
     this.activePositionIds.add(symbol);
     
+    // Record trade for learning
+    await learningService.recordTrade(trade, position, tradeContext);
     // Record trade for learning
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
@@ -342,6 +345,9 @@ class TradingBot {
     
     this.portfolio.trades.push(trade);
     this.portfolio.availableBalance += position.size * position.currentPrice;
+    
+    // Record position close for learning
+    await learningService.recordPositionClose(position, trade, reason);
     
     // Record position close for learning
     await learningService.recordPositionClose(position, trade, reason);
