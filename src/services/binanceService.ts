@@ -413,11 +413,15 @@ class BinanceService {
     }
   }
 
-  private async processRequestQueue(): void {
+  private async processRequestQueue(): Promise<void> {
     if (this.requestQueue.length > 0 && this.activeRequests < this.maxConcurrentRequests) {
       const nextRequest = this.requestQueue.shift();
       if (nextRequest) {
-        await nextRequest();
+        try {
+          await nextRequest();
+        } catch (error) {
+          console.error('Queued request failed:', error);
+        }
       }
     }
   }
