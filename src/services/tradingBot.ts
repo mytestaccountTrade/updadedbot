@@ -225,6 +225,11 @@ class TradingBot {
         ? adaptiveStrategy.shouldTrade(marketData)
         : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
       
+      // Log confidence threshold for debugging
+      if (this.config.adaptiveStrategyEnabled) {
+        console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Signal confidence: ${enhancedSignal.confidence.toFixed(3)}`);
+      }
+      
       if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
         console.log(`🚫 Adaptive strategy blocked trade: ${adaptiveDecision.reason}`);
         return;
@@ -241,7 +246,7 @@ class TradingBot {
       console.log(`🔍 ${marketData.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}, Sentiment: ${enhancedSignal.sentimentScore.toFixed(1)})`);
       
       // Fast learning trading logic
-      const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > (adaptiveDecision.strategy.entryThreshold * 0.8);
+      const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
       const randomTrade = Math.random() < 0.1; // 10% chance of random trade
       
       if (shouldTrade || randomTrade) {
@@ -459,8 +464,11 @@ class TradingBot {
             confidence: finalConfidence
           };
           
+          // Log confidence threshold for debugging
+          console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
+          
           // More aggressive entry - lower confidence threshold
-          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > adaptiveDecision.strategy.entryThreshold) {
+          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold) {
             console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
@@ -1046,6 +1054,46 @@ class TradingBot {
     this.fastLearningRetrainCounter = 0;
     
     console.log('✅ Complete AI learning reset finished');
+    
+    return true;
+  }
+
+  resetAllBotData() {
+    console.log('🔄 Resetting ALL bot data (AI learning + trade history + statistics)...');
+    
+    // Reset AI learning first
+    this.resetAILearning();
+    
+    // Reset portfolio to initial state
+    const initialBalance = this.config.mode === 'SIMULATION' ? this.config.simulationBalance : 10000;
+    this.portfolio = {
+      totalValue: initialBalance,
+      totalPnl: 0,
+      totalPnlPercent: 0,
+      availableBalance: initialBalance,
+      positions: [],
+      trades: [],
+    };
+    
+    // Clear all position tracking
+    this.activePositionIds.clear();
+    this.multiExitPositions.clear();
+    
+    // Reset fast learning counters
+    this.fastLearningTradeCount = 0;
+    this.lastFastLearningTrade = 0;
+    this.fastLearningRetrainCounter = 0;
+    
+    // Clear all localStorage data
+    localStorage.removeItem('trading-bot-history');
+    localStorage.removeItem('trading-bot-insights');
+    localStorage.removeItem('trading-bot-training-data');
+    localStorage.removeItem('adaptive-strategy-patterns');
+    localStorage.removeItem('adaptive-strategy-risk');
+    localStorage.removeItem('adaptive-strategy-trades');
+    localStorage.removeItem('adaptive-strategy-reflections');
+    
+    console.log('✅ Complete bot data reset finished - all history and statistics cleared');
     
     return true;
   }

@@ -41,15 +41,8 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
         const success = tradingBot.resetAILearning();
       } else {
         console.log('[AI SYSTEM] All bot data reset manually');
-        // Reset all bot data including trade history
-        tradingBot.resetAILearning();
-        // Clear additional data from localStorage
-        localStorage.removeItem('trading-bot-history');
-        localStorage.removeItem('trading-bot-insights');
-        localStorage.removeItem('adaptive-strategy-patterns');
-        localStorage.removeItem('adaptive-strategy-risk');
-        localStorage.removeItem('adaptive-strategy-trades');
-        localStorage.removeItem('adaptive-strategy-reflections');
+        // Reset all bot data including trade history and statistics
+        const success = tradingBot.resetAllBotData();
       }
       const success = true;
       if (success) {
@@ -532,7 +525,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               <h3 className="text-lg font-semibold text-gray-900">{t('resetConfirmTitle')}</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              {resetType === 'ai' ? t('resetConfirmMessage') : 'Are you sure you want to reset ALL bot data? This will clear trade history, statistics, and all AI learning. This cannot be undone.'}
+              {resetType === 'ai' ? t('resetConfirmMessage') : t('resetAllConfirmMessage')}
             </p>
             <div className="flex justify-end space-x-3">
               <button
