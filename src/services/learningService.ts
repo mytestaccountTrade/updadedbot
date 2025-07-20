@@ -755,17 +755,19 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   private analyzeProfitableIndicators(trades: TradeRecord[]): string[] {
     const indicators: string[] = [];
     
-    trades.forEach(trade => {
-      if (trade.indicators && trade.indicators.rsi < 30 && trade.outcome === 'PROFIT') {
+    trades.filter(trade => this.isValidTradeRecord(trade)).forEach(trade => {
+      const tradeIndicators = trade.indicators!; // Safe after validation
+      
+      if (tradeIndicators.rsi < 30 && trade.outcome === 'PROFIT') {
         indicators.push('RSI_OVERSOLD_BUY');
       }
-      if (trade.indicators && trade.indicators.rsi > 70 && trade.outcome === 'PROFIT') {
+      if (tradeIndicators.rsi > 70 && trade.outcome === 'PROFIT') {
         indicators.push('RSI_OVERBOUGHT_SELL');
       }
-      if (trade.indicators && trade.indicators.emaTrend === 'BULLISH' && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
+      if (tradeIndicators.emaTrend === 'BULLISH' && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
         indicators.push('EMA_BULLISH_BUY');
       }
-      if (typeof trade.sentimentScore === 'number' && trade.sentimentScore > 0.5 && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
+      if (trade.sentimentScore > 0.5 && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
         indicators.push('SENTIMENT_POSITIVE_BUY');
       }
     });
@@ -774,9 +776,10 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private analyzeMarketConditions(trades: TradeRecord[]): LearningInsights['marketConditions'] {
-    const bullish = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'BULLISH');
-    const bearish = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'BEARISH');
-    const neutral = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'NEUTRAL');
+    const validTrades = trades.filter(trade => this.isValidTradeRecord(trade));
+    const bullish = validTrades.filter(t => t.indicators!.emaTrend === 'BULLISH');
+    const bearish = validTrades.filter(t => t.indicators!.emaTrend === 'BEARISH');
+    const neutral = validTrades.filter(t => t.indicators!.emaTrend === 'NEUTRAL');
 
     return {
       bullish: {
