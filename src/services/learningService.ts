@@ -739,40 +739,6 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       .slice(0, 5)
       .map(([pattern]) => pattern);
   }
-      }
-      
-      if (trade.indicators && typeof trade.indicators.macd === 'number') {
-        if (trade.indicators.macd > 0) patterns.push('MACD_POSITIVE');
-        if (trade.indicators.macd < 0) patterns.push('MACD_NEGATIVE');
-      }
-      
-      if (trade.indicators && trade.indicators.emaTrend) {
-        if (trade.indicators.emaTrend === 'BULLISH') patterns.push('EMA_BULLISH');
-        if (trade.indicators.emaTrend === 'BEARISH') patterns.push('EMA_BEARISH');
-      }
-      
-      if (typeof trade.sentimentScore === 'number') {
-        if (trade.sentimentScore > 0.5) patterns.push('SENTIMENT_POSITIVE');
-        if (trade.sentimentScore < -0.5) patterns.push('SENTIMENT_NEGATIVE');
-      }
-      
-      if (trade.indicators && trade.indicators.bollingerPosition) {
-        if (trade.indicators.bollingerPosition === 'LOWER') patterns.push('BOLLINGER_LOWER');
-        if (trade.indicators.bollingerPosition === 'UPPER') patterns.push('BOLLINGER_UPPER');
-      }
-    });
-    
-    // Return most common patterns
-    const patternCounts = patterns.reduce((acc, pattern) => {
-      acc[pattern] = (acc[pattern] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    return Object.entries(patternCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([pattern]) => pattern);
-  }
 
   private analyzeBestTimeframes(trades: TradeRecord[]): number[] {
     const timeframes = trades
