@@ -127,33 +127,19 @@ class NewsService {
     confidence: number;
     reasoning: string;
     sentimentScore: number;
-    volatilityScore: number;
-    trendConsistency: number;
-    openPositionConflict: boolean;
-    tradeStyle: 'scalper' | 'swing' | 'conservative';
   }> {
     try {
       const relevantNews = news.filter(item => item.coins.includes(symbol.replace('USDT', '')));
       const sentimentScore = this.calculateSentimentScore(relevantNews);
-      const volatilityScore = this.calculateVolatilityScore(marketData);
-      const trendConsistency = this.calculateTrendConsistency(marketData);
-      const tradeStyle = this.determineTradeStyle(volatilityScore, sentimentScore, trendConsistency);
       
       // Try to use local Llama 3 for trading signal generation
       try {
-        const prompt = `Considering the current market state, open positions, and sentiment, should we BUY, SELL, or HOLD? Justify clearly.
+        const prompt = `Given RSI: ${marketData.rsi?.toFixed(2)}, EMA Trend: ${marketData.emaTrend}, and News Sentiment: ${sentimentScore.toFixed(2)}, should we BUY, SELL or HOLD? Explain why.
 
-Market Analysis:
-- Symbol: ${symbol}
+Additional context:
 - Price: ${marketData.price}
-- RSI: ${marketData.rsi?.toFixed(2)}
-- EMA Trend: ${marketData.emaTrend}
-- MACD: ${marketData.macd?.toFixed(4)}
 - Volume Ratio: ${marketData.volumeRatio?.toFixed(2)}
-- News Sentiment: ${sentimentScore.toFixed(2)}
-- Volatility Score: ${volatilityScore.toFixed(2)}
-- Trend Consistency: ${trendConsistency.toFixed(2)}
-- Recommended Style: ${tradeStyle}
+- MACD: ${marketData.macd?.toFixed(4)}
 
 Respond with: ACTION CONFIDENCE REASONING`;
 
@@ -181,16 +167,7 @@ Respond with: ACTION CONFIDENCE REASONING`;
             const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.6;
             const reasoning = result.replace(/(BUY|SELL|HOLD)/, '').replace(/\d+\.?\d*/, '').trim();
             
-            return { 
-              action, 
-              confidence, 
-              reasoning: reasoning || 'AI analysis', 
-              sentimentScore,
-              volatilityScore,
-              trendConsistency,
-              openPositionConflict: false,
-              tradeStyle
-            };
+            return { action, confidence, reasoning: reasoning || 'AI analysis', sentimentScore };
           }
         }
       } catch (llama3Error) {
@@ -209,75 +186,17 @@ Respond with: ACTION CONFIDENCE REASONING`;
       if (combinedScore > 0.3) {
         action = 'BUY';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}, volatility ${volatilityScore.toFixed(2)}`;
+        reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       } else if (combinedScore < -0.3) {
         action = 'SELL';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}, volatility ${volatilityScore.toFixed(2)}`;
+        reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       }
 
-      return { 
-        action, 
-        confidence, 
-        reasoning, 
-        sentimentScore,
-        volatilityScore,
-        trendConsistency,
-        openPositionConflict: false,
-        tradeStyle
-      };
+      return { action, confidence, reasoning, sentimentScore };
     } catch (error) {
       console.error('Trading signal generation failed:', error);
-      return { 
-        action: 'HOLD', 
-        confidence: 0.5, 
-        reasoning: 'Analysis failed', 
-        sentimentScore: 0,
-        volatilityScore: 0,
-        trendConsistency: 0,
-        openPositionConflict: false,
-        tradeStyle: 'conservative'
-      };
-    }
-  }
-
-  private calculateVolatilityScore(marketData: any): number {
-    if (!marketData.bollinger) return 0.5;
-    
-    const { upper, lower, middle } = marketData.bollinger;
-    const bandWidth = (upper - lower) / middle;
-    const pricePosition = (marketData.price - lower) / (upper - lower);
-    
-    // Higher band width = higher volatility
-    // Price near bands = higher volatility
-    const volatility = Math.min(1, bandWidth * 10 + Math.abs(pricePosition - 0.5));
-    return Math.max(0, Math.min(1, volatility));
-  }
-
-  private calculateTrendConsistency(marketData: any): number {
-    if (!marketData.ema12 || !marketData.ema26) return 0.5;
-    
-    const emaDiff = Math.abs(marketData.ema12 - marketData.ema26) / marketData.price;
-    const rsiTrend = marketData.rsi > 50 ? 1 : -1;
-    const emaTrendValue = marketData.emaTrend === 'BULLISH' ? 1 : marketData.emaTrend === 'BEARISH' ? -1 : 0;
-    const macdTrend = marketData.macd > 0 ? 1 : -1;
-    
-    // Check if all indicators agree
-    const agreement = Math.abs(rsiTrend + emaTrendValue + macdTrend) / 3;
-    const strength = Math.min(1, emaDiff * 100); // EMA separation strength
-    
-    return Math.max(0, Math.min(1, agreement * strength));
-  }
-
-  private determineTradeStyle(volatility: number, sentiment: number, consistency: number): 'scalper' | 'swing' | 'conservative' {
-    const avgScore = (volatility + Math.abs(sentiment) + consistency) / 3;
-    
-    if (volatility > 0.7 && Math.abs(sentiment) > 0.6) {
-      return 'scalper'; // High volatility + strong sentiment = scalp
-    } else if (consistency > 0.6 && avgScore > 0.5) {
-      return 'swing'; // Good consistency = swing trade
-    } else {
-      return 'conservative'; // Low confidence = conservative
+      return { action: 'HOLD', confidence: 0.5, reasoning: 'Analysis failed', sentimentScore: 0 };
     }
   }
 

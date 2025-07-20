@@ -64,7 +64,6 @@ export interface BotConfig {
   maxPositions: number;
   enableNewsTrading: boolean;
   enableTechnicalAnalysis: boolean;
-  tradeMode: 'scalper' | 'swing' | 'auto';
   apiKey?: string;
   apiSecret?: string;
   llama3Url?: string;
@@ -99,24 +98,4 @@ export interface TradingSignal {
   sentimentScore: number;
   marketData: MarketData;
   newsContext: NewsItem[];
-  volatilityScore: number;
-  trendConsistency: number;
-  openPositionConflict: boolean;
-  tradeStyle: 'scalper' | 'swing' | 'conservative';
-}
-
-export interface OpenPosition {
-  symbol: string;
-  side: 'LONG' | 'SHORT';
-  amount: number;
-  entryPrice: number;
-  unrealizedPnl: number;
-  timestamp: number;
-}
-
-export interface TradeCooldown {
-  symbol: string;
-  lastTradeTime: number;
-  consecutiveLosses: number;
-  pausedUntil?: number;
 }

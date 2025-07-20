@@ -206,53 +206,6 @@ class BinanceService {
     }
   }
 
-  async getOpenPositions(): Promise<OpenPosition[]> {
-    try {
-      if (!this.hasValidCredentials()) {
-        console.warn('API credentials not configured - returning empty positions');
-        return [];
-      }
-
-      const data = await this.makeRequest('/api/v3/account');
-      const openPositions: OpenPosition[] = [];
-      
-      if (data.balances) {
-        for (const balance of data.balances) {
-          const free = parseFloat(balance.free);
-          const locked = parseFloat(balance.locked);
-          const total = free + locked;
-          
-          // Only consider significant balances as open positions
-          if (total > 0.001 && balance.asset !== 'USDT') {
-            const symbol = `${balance.asset}USDT`;
-            
-            try {
-              const currentPrice = await this.getCurrentPrice(symbol);
-              if (currentPrice > 0) {
-                openPositions.push({
-                  symbol,
-                  side: 'LONG', // Spot trading is always LONG
-                  amount: total,
-                  entryPrice: currentPrice, // Approximation - real entry price not available in spot
-                  unrealizedPnl: 0, // Would need historical data to calculate
-                  timestamp: Date.now(),
-                });
-              }
-            } catch (priceError) {
-              console.warn(`Failed to get price for ${symbol}:`, priceError);
-            }
-          }
-        }
-      }
-      
-      console.log(`📊 Found ${openPositions.length} open positions from Binance`);
-      return openPositions;
-    } catch (error) {
-      console.error('Failed to get open positions:', error);
-      return [];
-    }
-  }
-
   private async getCurrentPrice(symbol: string): Promise<number> {
     try {
       const ticker = await this.makeRequest('/api/v3/ticker/price', { symbol });
