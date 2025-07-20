@@ -183,7 +183,9 @@ class BinanceService {
           method,
           headers: {
             ...(requiresAuth && { 'X-MBX-APIKEY': this.apiKey }),
+            'Accept': 'application/json, text/plain, */*',
             'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         });
@@ -191,8 +193,8 @@ class BinanceService {
         if (!response.ok) {
           const errorText = await response.text();
           
-          // Log first 200 characters of HTML response for debugging
-          const preview = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+          // Log first 100 characters of HTML response for debugging
+          const preview = errorText.length > 100 ? errorText.substring(0, 100) + '...' : errorText;
           console.warn(`⚠️ Binance API ${response.status} ${response.statusText} for ${endpoint}:`);
           console.warn(`Response preview: ${preview}`);
           
