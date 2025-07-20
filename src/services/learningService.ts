@@ -368,7 +368,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     
     // Pattern 1: RSI Oversold + Positive Sentiment
     const oversoldBullish = trades.filter(t => 
-      t.indicators.rsi < 30 && 
+      t.indicators && t.indicators.rsi < 30 && 
       t.sentimentScore > 0.5 && 
       t.action === 'BUY'
     );
@@ -394,7 +394,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     
     // Pattern 2: RSI Overbought + Negative Sentiment
     const overboughtBearish = trades.filter(t => 
-      t.indicators.rsi > 70 && 
+      t.indicators && t.indicators.rsi > 70 && 
       t.sentimentScore < -0.3 && 
       t.action === 'SELL'
     );
@@ -420,8 +420,8 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     
     // Pattern 3: Bullish EMA + High Volume
     const emaBullishVolume = trades.filter(t => 
-      t.indicators.emaTrend === 'BULLISH' && 
-      t.indicators.volumeRatio > 1.5 && 
+      t.indicators && t.indicators.emaTrend === 'BULLISH' && 
+      t.indicators && t.indicators.volumeRatio > 1.5 && 
       t.action === 'BUY'
     );
     
@@ -446,7 +446,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     
     // Pattern 4: Avoid BUY when RSI > 75 and sentiment > 0.6
     const avoidOverboughtBullish = trades.filter(t => 
-      t.indicators.rsi > 75 && 
+      t.indicators && t.indicators.rsi > 75 && 
       t.sentimentScore > 0.6 && 
       t.action === 'BUY'
     );
@@ -509,23 +509,35 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   private async fineTuneLlama3(trades: TradeRecord[]) {
     try {
       // Create training dataset from successful trades
-      const trainingData = trades
+      const validTrades = trades
         .filter(t => t.outcome === 'PROFIT')
+        .filter(t => t.indicators && typeof t.indicators.rsi === 'number')
+        .filter(t => t.marketDataSnapshot && typeof t.marketDataSnapshot.price === 'number');
+      
+      if (validTrades.length === 0) {
+        console.log('No valid trades for fine-tuning');
+        return;
+      }
+      
+      const trainingData = validTrades
         .map(t => ({
-          input: `Market: RSI ${t.marketContext.rsi}, MACD ${t.marketContext.macd}, Volume ${t.marketContext.volume}`,
+          input: `Market: RSI ${t.indicators.rsi}, MACD ${t.indicators.macd}, EMA Trend ${t.indicators.emaTrend}, Sentiment ${t.sentimentScore}`,
           output: `Action: ${t.action}, Confidence: ${t.confidence}, Result: ${t.profitPercent?.toFixed(2)}% profit`
         }));
 
-      if (trainingData.length < 3) return;
+      if (trainingData.length < 3) {
+        console.log('Insufficient valid training data');
+        return;
+      }
 
       // Save training dataset
       const dataset = {
         timestamp: Date.now(),
         trades: trainingData,
         metadata: {
-          totalTrades: trades.length,
-          profitableTrades: trades.filter(t => t.outcome === 'PROFIT').length,
-          winRate: (trades.filter(t => t.outcome === 'PROFIT').length / trades.length * 100).toFixed(2)
+          totalTrades: validTrades.length,
+          profitableTrades: validTrades.filter(t => t.outcome === 'PROFIT').length,
+          winRate: (validTrades.filter(t => t.outcome === 'PROFIT').length / validTrades.length * 100).toFixed(2)
         }
       };
 
@@ -608,16 +620,31 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     const patterns: string[] = [];
     
     trades.forEach(trade => {
-      if (trade.indicators.rsi < 30) patterns.push('RSI_OVERSOLD');
-      if (trade.indicators.rsi > 70) patterns.push('RSI_OVERBOUGHT');
-      if (trade.indicators.macd > 0) patterns.push('MACD_POSITIVE');
-      if (trade.indicators.macd < 0) patterns.push('MACD_NEGATIVE');
-      if (trade.indicators.emaTrend === 'BULLISH') patterns.push('EMA_BULLISH');
-      if (trade.indicators.emaTrend === 'BEARISH') patterns.push('EMA_BEARISH');
-      if (trade.sentimentScore > 0.5) patterns.push('SENTIMENT_POSITIVE');
-      if (trade.sentimentScore < -0.5) patterns.push('SENTIMENT_NEGATIVE');
-      if (trade.indicators.bollingerPosition === 'LOWER') patterns.push('BOLLINGER_LOWER');
-      if (trade.indicators.bollingerPosition === 'UPPER') patterns.push('BOLLINGER_UPPER');
+      // Add null checks for indicators
+      if (trade.indicators && typeof trade.indicators.rsi === 'number') {
+        if (trade.indicators.rsi < 30) patterns.push('RSI_OVERSOLD');
+        if (trade.indicators.rsi > 70) patterns.push('RSI_OVERBOUGHT');
+      }
+      
+      if (trade.indicators && typeof trade.indicators.macd === 'number') {
+        if (trade.indicators.macd > 0) patterns.push('MACD_POSITIVE');
+        if (trade.indicators.macd < 0) patterns.push('MACD_NEGATIVE');
+      }
+      
+      if (trade.indicators && trade.indicators.emaTrend) {
+        if (trade.indicators.emaTrend === 'BULLISH') patterns.push('EMA_BULLISH');
+        if (trade.indicators.emaTrend === 'BEARISH') patterns.push('EMA_BEARISH');
+      }
+      
+      if (typeof trade.sentimentScore === 'number') {
+        if (trade.sentimentScore > 0.5) patterns.push('SENTIMENT_POSITIVE');
+        if (trade.sentimentScore < -0.5) patterns.push('SENTIMENT_NEGATIVE');
+      }
+      
+      if (trade.indicators && trade.indicators.bollingerPosition) {
+        if (trade.indicators.bollingerPosition === 'LOWER') patterns.push('BOLLINGER_LOWER');
+        if (trade.indicators.bollingerPosition === 'UPPER') patterns.push('BOLLINGER_UPPER');
+      }
     });
     
     // Return most common patterns
@@ -648,16 +675,16 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     const indicators: string[] = [];
     
     trades.forEach(trade => {
-      if (trade.indicators.rsi < 30 && trade.outcome === 'PROFIT') {
+      if (trade.indicators && trade.indicators.rsi < 30 && trade.outcome === 'PROFIT') {
         indicators.push('RSI_OVERSOLD_BUY');
       }
-      if (trade.indicators.rsi > 70 && trade.outcome === 'PROFIT') {
+      if (trade.indicators && trade.indicators.rsi > 70 && trade.outcome === 'PROFIT') {
         indicators.push('RSI_OVERBOUGHT_SELL');
       }
-      if (trade.indicators.emaTrend === 'BULLISH' && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
+      if (trade.indicators && trade.indicators.emaTrend === 'BULLISH' && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
         indicators.push('EMA_BULLISH_BUY');
       }
-      if (trade.sentimentScore > 0.5 && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
+      if (typeof trade.sentimentScore === 'number' && trade.sentimentScore > 0.5 && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
         indicators.push('SENTIMENT_POSITIVE_BUY');
       }
     });
@@ -666,9 +693,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private analyzeMarketConditions(trades: TradeRecord[]): LearningInsights['marketConditions'] {
-    const bullish = trades.filter(t => t.indicators.emaTrend === 'BULLISH');
-    const bearish = trades.filter(t => t.indicators.emaTrend === 'BEARISH');
-    const neutral = trades.filter(t => t.indicators.emaTrend === 'NEUTRAL');
+    const bullish = trades.filter(t => t.indicators && t.indicators.emaTrend === 'BULLISH');
+    const bearish = trades.filter(t => t.indicators && t.indicators.emaTrend === 'BEARISH');
+    const neutral = trades.filter(t => t.indicators && t.indicators.emaTrend === 'NEUTRAL');
 
     return {
       bullish: {

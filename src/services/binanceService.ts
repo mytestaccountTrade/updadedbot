@@ -1,25 +1,107 @@
 import { TradingPair, Trade, MarketData } from '../types/trading';
 import CryptoJS from 'crypto-js';
 
+interface KlineData {
+  symbol: string;
+  openTime: number;
+  closeTime: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  trades: number;
+}
+
+interface SymbolInfo {
+  symbol: string;
+  minQty: number;
+  stepSize: number;
+  minNotional: number;
+}
+
 class BinanceService {
   private apiKey: string;
   private apiSecret: string;
   private baseUrl: string;
   private testnetUrl: string;
   private isTestnet: boolean;
+  private wsConnections: Map<string, WebSocket> = new Map();
+  private marketDataCache: Map<string, MarketData> = new Map();
+  private priceHistory: Map<string, number[]> = new Map();
+  private volumeHistory: Map<string, number[]> = new Map();
+  private validSymbols: Map<string, SymbolInfo> = new Map();
+  private reconnectAttempts: Map<string, number> = new Map();
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
 
   constructor() {
     this.apiKey = '';
     this.apiSecret = '';
     this.baseUrl = '/binance-api';
     this.testnetUrl = '/binance-testnet';
-    this.isTestnet = true; // Default to testnet for safety
+    this.isTestnet = true;
+    this.initializeSymbols();
   }
 
   setCredentials(apiKey: string, apiSecret: string, useTestnet: boolean = true) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.isTestnet = useTestnet;
+  }
+
+  private async initializeSymbols() {
+    try {
+      const exchangeInfo = await this.makeRequest('/api/v3/exchangeInfo');
+      
+      exchangeInfo.symbols
+        .filter((symbol: any) => symbol.status === 'TRADING' && symbol.symbol.endsWith('USDT'))
+        .forEach((symbol: any) => {
+          const lotSizeFilter = symbol.filters.find((f: any) => f.filterType === 'LOT_SIZE');
+          const notionalFilter = symbol.filters.find((f: any) => f.filterType === 'NOTIONAL');
+          
+          this.validSymbols.set(symbol.symbol, {
+            symbol: symbol.symbol,
+            minQty: parseFloat(lotSizeFilter?.minQty || '0.001'),
+            stepSize: parseFloat(lotSizeFilter?.stepSize || '0.001'),
+            minNotional: parseFloat(notionalFilter?.minNotional || '10')
+          });
+        });
+      
+      console.log(`✅ Loaded ${this.validSymbols.size} valid trading symbols`);
+    } catch (error) {
+      console.error('Failed to load symbol information:', error);
+    }
+  }
+
+  isValidSymbol(symbol: string): boolean {
+    return this.validSymbols.has(symbol);
+  }
+
+  getSymbolInfo(symbol: string): SymbolInfo | null {
+    return this.validSymbols.get(symbol) || null;
+  }
+
+  validateOrderQuantity(symbol: string, quantity: number): { valid: boolean; adjustedQty?: number; error?: string } {
+    const symbolInfo = this.getSymbolInfo(symbol);
+    if (!symbolInfo) {
+      return { valid: false, error: 'Invalid symbol' };
+    }
+
+    if (quantity < symbolInfo.minQty) {
+      return { valid: false, error: `Quantity below minimum: ${symbolInfo.minQty}` };
+    }
+
+    // Adjust quantity to step size
+    const adjustedQty = Math.floor(quantity / symbolInfo.stepSize) * symbolInfo.stepSize;
+    
+    // Check minimum notional value
+    const currentPrice = this.marketDataCache.get(symbol)?.price || 0;
+    if (adjustedQty * currentPrice < symbolInfo.minNotional) {
+      return { valid: false, error: `Order value below minimum notional: ${symbolInfo.minNotional}` };
+    }
+
+    return { valid: true, adjustedQty };
   }
 
   private hasValidCredentials(): boolean {
@@ -31,14 +113,12 @@ class BinanceService {
   }
 
   private async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
-    // Check if we need authentication for this endpoint
-    const requiresAuth = endpoint.includes('/api/v3/order') || endpoint.includes('/api/v3/account');
+    const requiresAuth = endpoint.includes('/api/v3/order') || endpoint.includes('/api/v3/account') || endpoint.includes('/api/v3/openOrders');
     
     if (requiresAuth && !this.hasValidCredentials()) {
       throw new Error('API credentials not configured. Please set your Binance API key and secret in the settings.');
     }
 
-    // Add timestamp for authenticated requests
     if (requiresAuth) {
       params.timestamp = Date.now();
       params.recvWindow = 5000;
@@ -47,7 +127,6 @@ class BinanceService {
     const url = `${this.getBaseUrl()}${endpoint}`;
     const queryString = new URLSearchParams(params).toString();
     
-    // Generate signature for authenticated requests
     let finalQueryString = queryString;
     if (requiresAuth) {
       const signature = CryptoJS.HmacSHA256(queryString, this.apiSecret).toString();
@@ -79,7 +158,7 @@ class BinanceService {
     try {
       const data = await this.makeRequest('/api/v3/ticker/24hr');
       return data
-        .filter((ticker: any) => ticker.symbol.endsWith('USDT'))
+        .filter((ticker: any) => ticker.symbol.endsWith('USDT') && this.isValidSymbol(ticker.symbol))
         .slice(0, 20)
         .map((ticker: any) => ({
           symbol: ticker.symbol,
@@ -95,18 +174,145 @@ class BinanceService {
     }
   }
 
+  subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
+    if (this.wsConnections.has(symbol)) {
+      console.log(`Already subscribed to ${symbol}`);
+      return;
+    }
+
+    const wsUrl = `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_1m`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log(`📡 WebSocket connected for ${symbol}`);
+      this.reconnectAttempts.set(symbol, 0);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const kline = data.k;
+        
+        if (!kline) return;
+
+        const klineData: KlineData = {
+          symbol: kline.s,
+          openTime: kline.t,
+          closeTime: kline.T,
+          open: kline.o,
+          high: kline.h,
+          low: kline.l,
+          close: kline.c,
+          volume: kline.v,
+          trades: kline.n
+        };
+
+        this.updateMarketData(klineData);
+        
+        const marketData = this.marketDataCache.get(symbol);
+        if (marketData && onUpdate) {
+          onUpdate(marketData);
+        }
+      } catch (error) {
+        console.error(`Error processing WebSocket data for ${symbol}:`, error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log(`📡 WebSocket disconnected for ${symbol}`);
+      this.wsConnections.delete(symbol);
+      this.scheduleReconnect(symbol, onUpdate);
+    };
+
+    ws.onerror = (error) => {
+      console.error(`WebSocket error for ${symbol}:`, error);
+    };
+
+    this.wsConnections.set(symbol, ws);
+  }
+
+  private scheduleReconnect(symbol: string, onUpdate?: (data: MarketData) => void): void {
+    const attempts = this.reconnectAttempts.get(symbol) || 0;
+    
+    if (attempts >= this.maxReconnectAttempts) {
+      console.error(`Max reconnection attempts reached for ${symbol}`);
+      return;
+    }
+
+    const delay = this.reconnectDelay * Math.pow(2, attempts);
+    console.log(`Reconnecting to ${symbol} in ${delay}ms (attempt ${attempts + 1})`);
+    
+    setTimeout(() => {
+      this.reconnectAttempts.set(symbol, attempts + 1);
+      this.subscribeToMarketData(symbol, onUpdate);
+    }, delay);
+  }
+
+  private updateMarketData(klineData: KlineData): void {
+    const symbol = klineData.symbol;
+    const price = parseFloat(klineData.close);
+    const volume = parseFloat(klineData.volume);
+
+    // Update price history
+    let prices = this.priceHistory.get(symbol) || [];
+    prices.push(price);
+    if (prices.length > 100) prices = prices.slice(-100);
+    this.priceHistory.set(symbol, prices);
+
+    // Update volume history
+    let volumes = this.volumeHistory.get(symbol) || [];
+    volumes.push(volume);
+    if (volumes.length > 100) volumes = volumes.slice(-100);
+    this.volumeHistory.set(symbol, volumes);
+
+    // Calculate indicators
+    const rsi = this.calculateRSI(prices);
+    const macd = this.calculateMACD(prices);
+    const ema12 = this.calculateEMA(prices, 12);
+    const ema26 = this.calculateEMA(prices, 26);
+    const emaTrend = this.calculateEMATrend(ema12, ema26);
+    const volumeRatio = this.calculateVolumeRatio(volumes);
+    const bollinger = this.calculateBollingerBands(prices);
+
+    const marketData: MarketData = {
+      symbol,
+      price,
+      timestamp: Date.now(),
+      volume,
+      rsi,
+      macd,
+      ema12,
+      ema26,
+      emaTrend,
+      volumeRatio,
+      bollinger,
+    };
+
+    this.marketDataCache.set(symbol, marketData);
+  }
+
   async getMarketData(symbol: string): Promise<MarketData | null> {
+    // Return cached data if available
+    const cached = this.marketDataCache.get(symbol);
+    if (cached) {
+      return cached;
+    }
+
+    // Fallback to REST API if WebSocket data not available
     try {
       const ticker = await this.makeRequest('/api/v3/ticker/24hr', { symbol });
       const klines = await this.makeRequest('/api/v3/klines', {
         symbol,
-        interval: '1h',
+        interval: '1m',
         limit: 50
       });
 
-      // Calculate technical indicators (simplified)
       const prices = klines.map((k: any) => parseFloat(k[4]));
       const volumes = klines.map((k: any) => parseFloat(k[5]));
+      
+      this.priceHistory.set(symbol, prices);
+      this.volumeHistory.set(symbol, volumes);
+
       const rsi = this.calculateRSI(prices);
       const macd = this.calculateMACD(prices);
       const ema12 = this.calculateEMA(prices, 12);
@@ -115,7 +321,7 @@ class BinanceService {
       const volumeRatio = this.calculateVolumeRatio(volumes);
       const bollinger = this.calculateBollingerBands(prices);
 
-      return {
+      const marketData: MarketData = {
         symbol,
         price: parseFloat(ticker.lastPrice),
         timestamp: Date.now(),
@@ -128,19 +334,43 @@ class BinanceService {
         volumeRatio,
         bollinger,
       };
+
+      this.marketDataCache.set(symbol, marketData);
+      return marketData;
     } catch (error) {
       console.error('Failed to fetch market data:', error);
       return null;
     }
   }
 
+  async getOpenPositions(): Promise<any[]> {
+    if (!this.hasValidCredentials()) {
+      return [];
+    }
+
+    try {
+      const openOrders = await this.makeRequest('/api/v3/openOrders');
+      return openOrders || [];
+    } catch (error) {
+      console.error('Failed to fetch open positions:', error);
+      return [];
+    }
+  }
+
   async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
     try {
+      // Validate symbol and quantity
+      const validation = this.validateOrderQuantity(symbol, quantity);
+      if (!validation.valid) {
+        console.error(`Order validation failed: ${validation.error}`);
+        return null;
+      }
+
       const params: any = {
         symbol,
         side,
         type: price ? 'LIMIT' : 'MARKET',
-        quantity: quantity.toString(),
+        quantity: validation.adjustedQty!.toString(),
       };
 
       if (price) {
@@ -155,7 +385,7 @@ class BinanceService {
         symbol,
         side,
         type: params.type,
-        quantity,
+        quantity: validation.adjustedQty!,
         price: price || parseFloat(result.fills?.[0]?.price || '0'),
         status: result.status === 'FILLED' ? 'FILLED' : 'PENDING',
         timestamp: Date.now(),
@@ -180,7 +410,6 @@ class BinanceService {
           if (parseFloat(balance.free) > 0 || parseFloat(balance.locked) > 0) {
             const total = parseFloat(balance.free) + parseFloat(balance.locked);
             
-            // Convert to USDT value (simplified - in production, you'd get current prices)
             if (balance.asset === 'USDT') {
               totalBalance += total;
             } else if (balance.asset === 'BTC') {
@@ -208,12 +437,32 @@ class BinanceService {
 
   private async getCurrentPrice(symbol: string): Promise<number> {
     try {
+      const cached = this.marketDataCache.get(symbol);
+      if (cached) return cached.price;
+      
       const ticker = await this.makeRequest('/api/v3/ticker/price', { symbol });
       return parseFloat(ticker.price);
     } catch (error) {
       console.error(`Failed to get price for ${symbol}:`, error);
       return 0;
     }
+  }
+
+  unsubscribeFromMarketData(symbol: string): void {
+    const ws = this.wsConnections.get(symbol);
+    if (ws) {
+      ws.close();
+      this.wsConnections.delete(symbol);
+      console.log(`📡 Unsubscribed from ${symbol}`);
+    }
+  }
+
+  disconnectAll(): void {
+    this.wsConnections.forEach((ws, symbol) => {
+      ws.close();
+      console.log(`📡 Disconnected from ${symbol}`);
+    });
+    this.wsConnections.clear();
   }
 
   private calculateRSI(prices: number[]): number {
@@ -261,7 +510,7 @@ class BinanceService {
 
   private calculateEMATrend(ema12: number, ema26: number): 'BULLISH' | 'BEARISH' | 'NEUTRAL' {
     const diff = ema12 - ema26;
-    const threshold = ema26 * 0.001; // 0.1% threshold
+    const threshold = ema26 * 0.001;
     
     if (diff > threshold) return 'BULLISH';
     if (diff < -threshold) return 'BEARISH';

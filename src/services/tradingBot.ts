@@ -8,12 +8,16 @@ class TradingBot {
   private portfolio: Portfolio;
   private isRunning: boolean = false;
   private intervalId: NodeJS.Timeout | null = null;
+  private fastLearningIntervalId: NodeJS.Timeout | null = null;
   private activePositionIds: Set<string> = new Set();
+  private subscribedSymbols: Set<string> = new Set();
+  private fastLearningTradeCount: number = 0;
 
   constructor() {
     this.config = {
       mode: 'SIMULATION',
       simulationBalance: 10000,
+      fastLearningMode: false,
       maxRiskPerTrade: 0.05, // 5% of portfolio per trade - more aggressive
       stopLossPercent: 0.03, // 3% stop loss - tighter for faster exits
       takeProfitPercent: 0.06, // 6% take profit - lower target for faster profits
@@ -94,34 +98,149 @@ class TradingBot {
     this.isRunning = true;
     console.log(`Trading bot started in ${this.config.mode} mode`);
     
+    // Subscribe to WebSocket data for top trading pairs
+    this.initializeWebSocketSubscriptions();
+    
     // Update real wallet balance if in real mode
     if (this.config.mode === 'REAL') {
       this.updateRealWalletBalance();
+      this.syncRealPositions();
     }
     
-    // Run trading loop every 10 seconds for faster execution
-    this.intervalId = setInterval(() => {
-      this.runTradingLoop();
-    }, 10000);
+    if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
+      console.log('🚀 Fast Learning Mode activated - executing micro-trades every 2 seconds');
+      this.fastLearningIntervalId = setInterval(() => {
+        this.runFastLearningLoop();
+      }, 2000);
+    } else {
+      // Run trading loop every 10 seconds for normal execution
+      this.intervalId = setInterval(() => {
+        this.runTradingLoop();
+      }, 10000);
+    }
     
     // Run initial loop
-    this.runTradingLoop();
+    if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
+      this.runFastLearningLoop();
+    } else {
+      this.runTradingLoop();
+    }
   }
 
   stop() {
     if (!this.isRunning) return;
     
     this.isRunning = false;
+    
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    
+    if (this.fastLearningIntervalId) {
+      clearInterval(this.fastLearningIntervalId);
+      this.fastLearningIntervalId = null;
+    }
+    
+    // Disconnect WebSocket connections
+    binanceService.disconnectAll();
+    this.subscribedSymbols.clear();
     
     console.log('Trading bot stopped');
   }
 
   isActive(): boolean {
     return this.isRunning;
+  }
+
+  private async initializeWebSocketSubscriptions() {
+    try {
+      const tradingPairs = await binanceService.getTradingPairs();
+      const topPairs = tradingPairs.slice(0, 10);
+      
+      for (const pair of topPairs) {
+        if (!this.subscribedSymbols.has(pair.symbol)) {
+          binanceService.subscribeToMarketData(pair.symbol, (marketData) => {
+            this.onMarketDataUpdate(marketData);
+          });
+          this.subscribedSymbols.add(pair.symbol);
+        }
+      }
+      
+      console.log(`📡 Subscribed to ${topPairs.length} WebSocket streams`);
+    } catch (error) {
+      console.error('Failed to initialize WebSocket subscriptions:', error);
+    }
+  }
+
+  private onMarketDataUpdate(marketData: MarketData) {
+    // This is called on every WebSocket update
+    // In fast learning mode, this could trigger immediate trading decisions
+    if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
+      // Fast learning logic is handled in runFastLearningLoop
+      return;
+    }
+  }
+
+  private async syncRealPositions() {
+    if (this.config.mode !== 'REAL') return;
+    
+    try {
+      const openPositions = await binanceService.getOpenPositions();
+      console.log(`🔄 Synced ${openPositions.length} real positions`);
+      
+      // Update portfolio with real positions
+      // This would need more complex logic to convert Binance orders to our Position format
+    } catch (error) {
+      console.error('Failed to sync real positions:', error);
+    }
+  }
+
+  private async runFastLearningLoop() {
+    try {
+      console.log(`🧠 Fast Learning Loop #${this.fastLearningTradeCount + 1}`);
+      
+      // Get learning insights before making decisions
+      const learningInsights = await learningService.getMarketInsights();
+      
+      // Get cached market data from WebSocket
+      const tradingPairs = await binanceService.getTradingPairs();
+      const news = await newsService.fetchCryptoNews();
+      
+      // Update existing positions
+      await this.updatePositions();
+      
+      // Execute micro-trades more aggressively
+      for (const pair of tradingPairs.slice(0, 5)) {
+        if (this.portfolio.positions.length >= this.config.maxPositions) break;
+        
+        if (this.activePositionIds.has(pair.symbol)) continue;
+        
+        const marketData = await binanceService.getMarketData(pair.symbol);
+        if (!marketData) continue;
+        
+        const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
+        const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+        
+        // Lower confidence threshold for fast learning
+        if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.4) {
+          console.log(`⚡ Fast Learning Trade: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
+          await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
+          this.fastLearningTradeCount++;
+          
+          // Trigger learning every 3-5 trades instead of 20
+          if (this.fastLearningTradeCount % 3 === 0) {
+            console.log('🧠 Fast Learning: Triggering early model retraining...');
+            await learningService.retrainModel();
+          }
+        }
+      }
+      
+      this.updatePortfolioMetrics();
+      
+    } catch (error) {
+      console.error('Fast learning loop error:', error);
+    }
   }
 
   private async runTradingLoop() {
