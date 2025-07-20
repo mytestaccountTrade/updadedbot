@@ -17,10 +17,23 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
   const handleSave = () => {
     // Handle adaptive strategy toggle
     if (formData.adaptiveStrategyEnabled !== config.adaptiveStrategyEnabled) {
-      (window as any).tradingBot?.toggleAdaptiveStrategy(formData.adaptiveStrategyEnabled);
+      console.log(`[AI SYSTEM] Adaptive strategy toggled ${formData.adaptiveStrategyEnabled ? 'ON' : 'OFF'}`);
     }
     
     onSave(formData);
+  };
+
+  const handleResetAILearning = async () => {
+    try {
+      console.log('[AI SYSTEM] Learning reset manually.');
+      const success = tradingBot.resetAILearning();
+      if (success) {
+        setShowResetToast(true);
+        setTimeout(() => setShowResetToast(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to reset AI learning:', error);
+    }
   };
 
   const handleChange = (field: keyof BotConfig, value: any) => {
