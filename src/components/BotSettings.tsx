@@ -139,6 +139,40 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
           )}
 
           {/* Llama 3 Configuration */}
+        {/* Fast Learning Mode */}
+        {formData.mode === 'SIMULATION' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Fast Learning Mode</label>
+            <div className="flex items-center justify-between p-4 rounded-lg border-2 border-gray-300">
+              <div>
+                <div className="font-medium text-gray-900">Fast Learning Mode</div>
+                <div className="text-sm text-gray-600">Execute micro-trades every 2 seconds for rapid learning (Simulation only)</div>
+              </div>
+              <button
+                onClick={() => handleChange('fastLearningMode', !formData.fastLearningMode)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.fastLearningMode ? 'bg-purple-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.fastLearningMode ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {formData.fastLearningMode && (
+              <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-purple-800">
+                    ⚡ Fast Learning: Executes trades every 2 seconds, retrains AI every 3 trades
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">{t('llama3Configuration')}</h3>
             

@@ -179,7 +179,7 @@ class LearningService {
     
     // Trigger retraining every 20 trades
     if (this.tradeHistory.length - this.lastRetrainCount >= 20) {
-      await this.retrainModel();
+      await this.retrainModelInternal();
       this.lastRetrainCount = this.tradeHistory.length;
     } else if (this.tradeHistory.length % 10 === 0) {
       await this.updateLearningInsights();
@@ -327,7 +327,12 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     }
   }
 
-  private async retrainModel() {
+  // Public method to trigger retraining manually
+  async retrainModel() {
+    await this.retrainModelInternal();
+  }
+
+  private async retrainModelInternal() {
     console.log('🧠 Starting model retraining...');
     
     const completedTrades = this.tradeHistory.filter(t => t.exitPrice !== undefined);
