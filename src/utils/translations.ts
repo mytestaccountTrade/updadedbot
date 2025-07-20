@@ -210,6 +210,7 @@ export const translations = {
     resetAiOnly: 'Sadece AI\'ı sıfırla',
     resetAllBotData: 'Tüm Bot Verilerini Sıfırla (ticaret geçmişi ve istatistikler dahil)',
     confidenceThreshold: 'Güven Eşiği',
+    confidenceThresholdDescription: 'Tüm AI tabanlı işlemler ve uyarlanabilir strateji kararları için gereken minimum güven seviyesi. Hem AI sinyal üretimi hem de uyarlanabilir strateji filtrelemesi tarafından kullanılır.',
     
     // Sentiment
     bullish: 'YÜKSELIŞ',

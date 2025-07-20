@@ -31,6 +31,10 @@ export const Dashboard: React.FC = () => {
     updateLearningStats();
     const interval = setInterval(fetchData, 30000);
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
+    
+    // Initialize bot with saved settings
+    console.log('🚀 Dashboard initialized with saved bot configuration');
+    
     return () => {
       clearInterval(interval);
       clearInterval(learningInterval);

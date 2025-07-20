@@ -306,8 +306,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                   step="0.01"
                   value={formData.confidenceThreshold}
                   onChange={(e) => handleChange('confidenceThreshold', parseFloat(e.target.value))}
-                  disabled={!formData.adaptiveStrategyEnabled}
-                  className={`w-full ${!formData.adaptiveStrategyEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className="w-full"
                 />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
                   <span>50%</span>
