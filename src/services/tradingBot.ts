@@ -12,6 +12,8 @@ class TradingBot {
   private activePositionIds: Set<string> = new Set();
   private subscribedSymbols: Set<string> = new Set();
   private fastLearningTradeCount: number = 0;
+  private lastFastLearningTrade: number = 0;
+  private fastLearningRetrainCounter: number = 0;
 
   constructor() {
     this.config = {
@@ -112,21 +114,14 @@ class TradingBot {
     }
     
     if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
-      console.log('🚀 Fast Learning Mode activated - executing micro-trades every 2 seconds');
-      this.fastLearningIntervalId = setInterval(() => {
-        this.runFastLearningLoop();
-      }, 2000);
+      console.log('🚀 Fast Learning Mode activated - WebSocket-driven aggressive trading');
+      // Fast learning is now driven by WebSocket updates, not intervals
     } else {
       // Run trading loop every 10 seconds for normal execution
       this.intervalId = setInterval(() => {
         this.runTradingLoop();
       }, 10000);
-    }
-    
-    // Run initial loop
-    if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
-      this.runFastLearningLoop();
-    } else {
+      // Run initial loop
       this.runTradingLoop();
     }
   }
@@ -178,11 +173,10 @@ class TradingBot {
   }
 
   private onMarketDataUpdate(marketData: MarketData) {
-    // This is called on every WebSocket update
-    // In fast learning mode, this could trigger immediate trading decisions
+    // WebSocket-driven Fast Learning Mode
     if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
-      // Fast learning logic is handled in runFastLearningLoop
-      return;
+      // Execute aggressive trading on every WebSocket update
+      this.executeWebSocketFastLearning(marketData);
     }
   }
 
