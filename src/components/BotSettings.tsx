@@ -412,7 +412,14 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                   formData.enableNewsTrading ? 'bg-blue-600' : 'bg-gray-300'
                 }`}
               >
+                <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.enableNewsTrading ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-900">{t('technicalAnalysis')}</div>
