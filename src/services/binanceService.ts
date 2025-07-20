@@ -40,7 +40,7 @@ class BinanceService {
     this.apiSecret = '';
     this.baseUrl = '/binance-api';
     this.testnetUrl = '/binance-testnet';
-    this.isTestnet = true;
+    this.isTestnet = false;
     this.initializeSymbols();
   }
 
