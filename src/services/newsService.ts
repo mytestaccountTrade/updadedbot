@@ -471,7 +471,11 @@ Respond with: ACTION CONFIDENCE REASONING`;
     if (this.llama3RequestQueue.length > 0 && this.activeLlama3Requests < this.maxConcurrentLlama3Requests) {
       const nextRequest = this.llama3RequestQueue.shift();
       if (nextRequest) {
-        await nextRequest();
+        try {
+          await nextRequest();
+        } catch (error) {
+          console.error('Queued Llama 3 request failed:', error);
+        }
       }
     }
   }
