@@ -594,6 +594,11 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
+    // Ensure availableBalance doesn't become NaN
+    if (isNaN(this.portfolio.availableBalance)) {
+      this.portfolio.availableBalance = 0;
+    }
+    
     console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (${this.config.fastLearningMode ? 'FAST' : 'NORMAL'} mode)`);
   }
 
@@ -631,6 +636,11 @@ class TradingBot {
     this.portfolio.trades.push(trade);
     this.portfolio.availableBalance += position.size * position.currentPrice;
     
+    // Ensure availableBalance doesn't become NaN
+    if (isNaN(this.portfolio.availableBalance)) {
+      this.portfolio.availableBalance = this.config.simulationBalance || 10000;
+    }
+    
     // Record position close for learning
     await learningService.recordPositionClose(position, trade, reason);
     
@@ -652,12 +662,26 @@ class TradingBot {
       return sum + (isNaN(pnl) ? 0 : pnl);
     }, 0);
     
-    const availableBalance = this.portfolio.availableBalance || 0;
+    // Ensure availableBalance is never NaN
+    let availableBalance = this.portfolio.availableBalance;
+    if (isNaN(availableBalance) || availableBalance === undefined || availableBalance === null) {
+      availableBalance = this.config.simulationBalance || 10000;
+      this.portfolio.availableBalance = availableBalance;
+    }
+    
     const simulationBalance = this.config.simulationBalance || 10000;
     
-    this.portfolio.totalValue = isNaN(availableBalance) ? simulationBalance : availableBalance + positionsValue;
+    this.portfolio.totalValue = availableBalance + positionsValue;
     this.portfolio.totalPnl = isNaN(totalPnl) ? 0 : totalPnl;
     this.portfolio.totalPnlPercent = simulationBalance > 0 ? (totalPnl / simulationBalance) * 100 : 0;
+    
+    // Final safety check to ensure no NaN values
+    if (isNaN(this.portfolio.totalValue)) {
+      this.portfolio.totalValue = simulationBalance;
+    }
+    if (isNaN(this.portfolio.availableBalance)) {
+      this.portfolio.availableBalance = simulationBalance;
+    }
   }
 
   // Manual trading methods
