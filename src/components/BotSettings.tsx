@@ -43,18 +43,6 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
     }));
   };
 
-  const handleResetAILearning = async () => {
-    try {
-      const success = (window as any).tradingBot?.resetAILearning();
-      if (success) {
-        setShowResetToast(true);
-        setTimeout(() => setShowResetToast(false), 3000);
-      }
-    } catch (error) {
-      console.error('Failed to reset AI learning:', error);
-    }
-  };
-
   return (
     <>
       {showResetToast && (
