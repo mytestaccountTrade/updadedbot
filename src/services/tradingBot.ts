@@ -701,8 +701,16 @@ class TradingBot {
 
   private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
     try {
+      // Enhanced learning-based exit with market regime context
+      const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
       const exitSignal = await learningService.shouldExit(position, marketData);
-      return exitSignal.shouldExit && exitSignal.confidence > 0.7;
+      
+      // Adjust confidence threshold based on market condition
+      let confidenceThreshold = 0.7;
+      if (marketCondition.type === 'HIGH_VOLATILITY') confidenceThreshold = 0.6;
+      if (marketCondition.type === 'UNCERTAIN') confidenceThreshold = 0.5;
+      
+      return exitSignal.shouldExit && exitSignal.confidence > confidenceThreshold;
     } catch (error) {
       console.error('Learning-based exit analysis failed:', error);
       return false;
