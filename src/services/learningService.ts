@@ -862,6 +862,17 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     };
   }
 
+  private isValidTradeRecord(trade: TradeRecord): boolean {
+    return !!(
+      trade &&
+      trade.indicators &&
+      trade.outcome &&
+      typeof trade.indicators.rsi === 'number' &&
+      typeof trade.indicators.emaTrend === 'string' &&
+      ['PROFIT', 'LOSS', 'BREAKEVEN'].includes(trade.outcome)
+    );
+  }
+
   private calculateIndicators(marketData: any): TradeRecord['indicators'] {
     const bollinger = marketData.bollinger || { upper: 0, middle: 0, lower: 0 };
     const price = marketData.price || 0;
@@ -957,7 +968,17 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       }
     } catch (error) {
       console.error('Failed to save learning insights:', error);
-      localStorage.setItem('trading-bot-insights', JSON.stringify(data));
+      // Fallback to localStorage with safe data handling
+      try {
+        const fallbackData = {
+          id: 'insights',
+          insights: this.learningInsights,
+          lastUpdate: this.lastLearningUpdate
+        };
+        localStorage.setItem('trading-bot-insights', JSON.stringify(fallbackData));
+      } catch (fallbackError) {
+        console.error('Failed to save to localStorage as fallback:', fallbackError);
+      }
     }
   }
 
