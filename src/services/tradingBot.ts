@@ -41,7 +41,7 @@ class TradingBot {
     };
 
     // Load adaptive strategy setting from localStorage
-    this.loadAdaptiveStrategySetting();
+    adaptiveStrategy.loadStoredData();
   }
 
   setConfig(config: Partial<BotConfig>) {
