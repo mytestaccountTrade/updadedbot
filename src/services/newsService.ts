@@ -5,10 +5,23 @@ class NewsService {
   private lastFetchTime: number = 0;
   private llama3Url: string = 'http://localhost:11434'; // Default Ollama URL
   private llama3Model: string = 'llama3';
+  
+  // Throttling and health monitoring for Llama 3
+  private llama3LastCheck: number = 0;
+  private llama3HealthCheckInterval: number = 60000; // 1 minute
+  private llama3Available: boolean = true;
+  private llama3RequestThrottle: number = 2000; // 2 seconds between requests
+  private lastLlama3Request: number = 0;
+  private llama3RequestQueue: Array<() => Promise<any>> = [];
+  private maxConcurrentLlama3Requests: number = 1;
+  private activeLlama3Requests: number = 0;
 
   setLlama3Config(url: string, model: string = 'llama3') {
     this.llama3Url = url;
     this.llama3Model = model;
+    // Reset health status when config changes
+    this.llama3Available = true;
+    this.llama3LastCheck = 0;
   }
 
   async fetchCryptoNews(): Promise<NewsItem[]> {
@@ -66,34 +79,27 @@ class NewsService {
     try {
       // Try to use local Llama 3 first, fallback to simple analysis
       try {
-        const response = await fetch(`${this.llama3Url}/api/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: this.llama3Model,
-            prompt: `Analyze the sentiment of this crypto news text and respond with only "BULLISH", "BEARISH", or "NEUTRAL" followed by a confidence score from 0.0 to 1.0. Text: "${text}"`,
-            stream: false,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.response.trim().toUpperCase();
+        if (await this.isLlama3Available()) {
+          const prompt = `Analyze the sentiment of this crypto news text and respond with only "BULLISH", "BEARISH", or "NEUTRAL" followed by a confidence score from 0.0 to 1.0. Text: "${text}"`;
+          const response = await this.queryLlama3Throttled(prompt);
           
-          // Parse Llama 3 response
-          const sentimentMatch = result.match(/(BULLISH|BEARISH|NEUTRAL)/);
-          const confidenceMatch = result.match(/(\d+\.?\d*)/);
-          
-          if (sentimentMatch) {
-            const sentiment = sentimentMatch[1] as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-            const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.7;
-            return { sentiment, confidence };
+          if (response) {
+            const result = response.trim().toUpperCase();
+            
+            // Parse Llama 3 response
+            const sentimentMatch = result.match(/(BULLISH|BEARISH|NEUTRAL)/);
+            const confidenceMatch = result.match(/(\d+\.?\d*)/);
+            
+            if (sentimentMatch) {
+              const sentiment = sentimentMatch[1] as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+              const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.7;
+              return { sentiment, confidence };
+            }
           }
         }
       } catch (llama3Error) {
-        console.log('Llama 3 not available, using fallback analysis');
+        console.log('Llama 3 sentiment analysis failed, using fallback');
+        this.llama3Available = false;
       }
       
       // Fallback to simple keyword analysis
@@ -134,6 +140,7 @@ class NewsService {
       
       // Try to use local Llama 3 for trading signal generation
       try {
+        if (await this.isLlama3Available()) {
         const prompt = `Given RSI: ${marketData.rsi?.toFixed(2)}, EMA Trend: ${marketData.emaTrend}, and News Sentiment: ${sentimentScore.toFixed(2)}, should we BUY, SELL or HOLD? Explain why.
 
 Additional context:
@@ -143,21 +150,10 @@ Additional context:
 
 Respond with: ACTION CONFIDENCE REASONING`;
 
-        const response = await fetch(`${this.llama3Url}/api/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: this.llama3Model,
-            prompt,
-            stream: false,
-          }),
-        });
+          const response = await this.queryLlama3Throttled(prompt);
 
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.response.trim();
+          if (response) {
+            const result = response.trim();
           
           const actionMatch = result.match(/(BUY|SELL|HOLD)/);
           const confidenceMatch = result.match(/(\d+\.?\d*)/);
@@ -169,8 +165,10 @@ Respond with: ACTION CONFIDENCE REASONING`;
             
             return { action, confidence, reasoning: reasoning || 'AI analysis', sentimentScore };
           }
+          }
         }
       } catch (llama3Error) {
+        this.llama3Available = false;
         console.log('Llama 3 not available for trading signals, using fallback');
       }
 
@@ -364,6 +362,118 @@ Respond with: ACTION CONFIDENCE REASONING`;
     else if (marketData.bollinger && marketData.price > marketData.bollinger.upper) score -= 0.4;
     
     return Math.max(-1, Math.min(1, score));
+  }
+
+  // Llama 3 health monitoring and throttling
+  private async isLlama3Available(): Promise<boolean> {
+    const now = Date.now();
+    
+    // Check health periodically
+    if (now - this.llama3LastCheck > this.llama3HealthCheckInterval) {
+      this.llama3LastCheck = now;
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(`${this.llama3Url}/api/tags`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        this.llama3Available = response.ok;
+        
+        if (!this.llama3Available) {
+          console.warn('🔴 Llama 3 health check failed - server not responding properly');
+        } else {
+          console.log('🟢 Llama 3 health check passed');
+        }
+      } catch (error) {
+        this.llama3Available = false;
+        console.warn('🔴 Llama 3 health check failed:', error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
+    
+    return this.llama3Available;
+  }
+
+  private async queryLlama3Throttled(prompt: string): Promise<string | null> {
+    // Check if Llama 3 is available
+    if (!this.llama3Available) {
+      return null;
+    }
+    
+    // Throttle requests
+    const now = Date.now();
+    if (now - this.lastLlama3Request < this.llama3RequestThrottle) {
+      console.log('🕒 Llama 3 request throttled');
+      return null;
+    }
+    
+    // Queue request if too many concurrent requests
+    if (this.activeLlama3Requests >= this.maxConcurrentLlama3Requests) {
+      return new Promise((resolve) => {
+        this.llama3RequestQueue.push(async () => {
+          const result = await this.executeLlama3Request(prompt);
+          resolve(result);
+          return result;
+        });
+      });
+    }
+    
+    return this.executeLlama3Request(prompt);
+  }
+
+  private async executeLlama3Request(prompt: string): Promise<string | null> {
+    this.activeLlama3Requests++;
+    this.lastLlama3Request = Date.now();
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${this.llama3Url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.llama3Model,
+          prompt,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        this.llama3Available = false;
+        throw new Error(`Llama 3 request failed: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.response;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('🕒 Llama 3 request timed out');
+      } else {
+        console.error('Llama 3 request failed:', error);
+      }
+      this.llama3Available = false;
+      return null;
+    } finally {
+      this.activeLlama3Requests--;
+      this.processLlama3RequestQueue();
+    }
+  }
+
+  private async processLlama3RequestQueue(): void {
+    if (this.llama3RequestQueue.length > 0 && this.activeLlama3Requests < this.maxConcurrentLlama3Requests) {
+      const nextRequest = this.llama3RequestQueue.shift();
+      if (nextRequest) {
+        await nextRequest();
+      }
+    }
   }
 
   getLatestNews(): NewsItem[] {

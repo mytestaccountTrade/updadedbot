@@ -72,6 +72,14 @@ class LearningService {
   private llama3Url: string = 'http://localhost:11434';
   private llama3Model: string = 'llama3';
   private db: IDBDatabase | null = null;
+  
+  // Throttling for learning operations
+  private learningOperationThrottle: number = 5000; // 5 seconds
+  private lastLearningOperation: number = 0;
+  private llama3RequestThrottle: number = 3000; // 3 seconds between LLM requests
+  private lastLlama3Request: number = 0;
+  private maxConcurrentLearningOps: number = 1;
+  private activeLearningOps: number = 0;
 
   constructor() {
     this.initIndexedDB();
@@ -195,6 +203,14 @@ class LearningService {
   }
 
   async enhanceSignal(signal: any, marketData: MarketData, insights: LearningInsights): Promise<any> {
+    // Throttle signal enhancement to prevent overload
+    const now = Date.now();
+    if (now - this.lastLearningOperation < this.learningOperationThrottle) {
+      return signal; // Return original signal if throttled
+    }
+    
+    this.lastLearningOperation = now;
+    
     if (!insights || this.tradeHistory.length < 5) {
       return signal;
     }
@@ -217,6 +233,12 @@ class LearningService {
     }
 
     try {
+      // Throttle Llama 3 requests
+      if (now - this.lastLlama3Request < this.llama3RequestThrottle) {
+        console.log('🕒 Learning LLM request throttled');
+        return signal;
+      }
+      
       // Use LLaMA 3 to enhance the signal based on learning
       const prompt = `Based on trading history analysis:
 Successful patterns: ${insights.successfulPatterns.join(', ')}
@@ -228,6 +250,7 @@ Should we modify this signal? Respond with: ACTION CONFIDENCE REASONING
 Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why.`;
 
       const response = await this.queryLlama3(prompt);
+      this.lastLlama3Request = Date.now();
       const enhanced = this.parseEnhancedSignal(response, signal);
       
       return enhanced;
@@ -358,6 +381,12 @@ Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why
   }
 
   async shouldExit(position: Position, marketData: MarketData): Promise<{ shouldExit: boolean; confidence: number; reason: string }> {
+    // Throttle exit analysis
+    const now = Date.now();
+    if (now - this.lastLearningOperation < this.learningOperationThrottle) {
+      return { shouldExit: false, confidence: 0, reason: 'Analysis throttled' };
+    }
+    
     if (this.tradeHistory.length < 3) {
       return { shouldExit: false, confidence: 0, reason: 'Insufficient learning data' };
     }
@@ -382,6 +411,12 @@ Similar trades success rate: ${(holdingSuccessRate * 100).toFixed(1)}%
 
 Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
 
+      // Throttle Llama 3 requests
+      if (now - this.lastLlama3Request < this.llama3RequestThrottle) {
+        return { shouldExit: false, confidence: 0, reason: 'LLM request throttled' };
+      }
+      
+      this.lastLlama3Request = Date.now();
       const response = await this.queryLlama3(prompt);
       return this.parseExitDecision(response);
     } catch (error) {
@@ -395,6 +430,15 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async retrainModelInternal() {
+    // Prevent concurrent retraining operations
+    if (this.activeLearningOps > 0) {
+      console.log('🕒 Retraining skipped - operation already in progress');
+      return;
+    }
+    
+    this.activeLearningOps++;
+    
+    try {
     console.log('🧠 Starting model retraining...');
     
     const completedTrades = this.tradeHistory.filter(t => t.exitPrice !== undefined);
@@ -427,6 +471,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     
     if (mostProfitable) {
       console.log(`💰 Most profitable pattern: ${mostProfitable.description}`);
+    }
+    } finally {
+      this.activeLearningOps--;
     }
   }
 
@@ -542,6 +589,14 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async updateLearningInsights() {
+    // Prevent concurrent insight updates
+    if (this.activeLearningOps > 0) {
+      return;
+    }
+    
+    this.activeLearningOps++;
+    
+    try {
     if (this.tradeHistory.length < 5) return;
 
     console.log('🧠 Updating learning insights...');
@@ -571,6 +626,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     await this.fineTuneLlama3(completedTrades);
     
     console.log('✅ Learning insights updated');
+    } finally {
+      this.activeLearningOps--;
+    }
   }
 
   private async fineTuneLlama3(trades: TradeRecord[]) {
@@ -634,6 +692,10 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async queryLlama3(prompt: string): Promise<string> {
+    // Add timeout and error handling for Llama 3 requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
     const response = await fetch(`${this.llama3Url}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -642,8 +704,11 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
         prompt,
         stream: false,
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+    
     if (!response.ok) throw new Error('LLaMA 3 query failed');
     
     const data = await response.json();

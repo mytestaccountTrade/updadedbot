@@ -397,8 +397,15 @@ class TradingBot {
       
       console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
       
-      // Look for new trading opportunities - check more pairs for better opportunities
-      for (const pair of tradingPairs.slice(0, 20)) {
+      // Process trading pairs in batches to prevent resource overload
+      const batchSize = 3;
+      const pairs = tradingPairs.slice(0, 12); // Reduced from 20 to 12
+      
+      for (let i = 0; i < pairs.length; i += batchSize) {
+        const batch = pairs.slice(i, i + batchSize);
+        
+        // Process batch in parallel but with limited concurrency
+        await Promise.all(batch.map(async (pair) => {
         if (this.portfolio.positions.length >= this.config.maxPositions) break;
         
         // Skip if we already have a position in this symbol
@@ -416,6 +423,12 @@ class TradingBot {
         if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.6) {
           console.log(`🎯 Trading signal: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
           await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
+        }
+        }));
+        
+        // Add small delay between batches to prevent overwhelming the system
+        if (i + batchSize < pairs.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
         }
       }
       

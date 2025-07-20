@@ -34,6 +34,17 @@ class BinanceService {
   private reconnectAttempts: Map<string, number> = new Map();
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  
+  // Throttling and rate limiting
+  private lastTradingPairsFetch: number = 0;
+  private tradingPairsThrottle: number = 30000; // 30 seconds
+  private lastMarketDataFetch: Map<string, number> = new Map();
+  private marketDataThrottle: number = 5000; // 5 seconds per symbol
+  private wsMessageThrottle: Map<string, number> = new Map();
+  private wsThrottleDelay: number = 500; // 500ms per symbol
+  private maxConcurrentRequests: number = 3;
+  private activeRequests: number = 0;
+  private requestQueue: Array<() => Promise<any>> = [];
 
   constructor() {
     this.apiKey = '';
@@ -155,9 +166,17 @@ class BinanceService {
   }
 
   async getTradingPairs(): Promise<TradingPair[]> {
+    // Throttle trading pairs fetch to prevent excessive API calls
+    const now = Date.now();
+    if (now - this.lastTradingPairsFetch < this.tradingPairsThrottle) {
+      console.log('🕒 Trading pairs fetch throttled, using cached data');
+      return this.getCachedTradingPairs();
+    }
+
     try {
+      this.lastTradingPairsFetch = now;
       const data = await this.makeRequest('/api/v3/ticker/24hr');
-      return data
+      const pairs = data
         .filter((ticker: any) => ticker.symbol.endsWith('USDT') && this.isValidSymbol(ticker.symbol))
         .slice(0, 20)
         .map((ticker: any) => ({
@@ -168,6 +187,10 @@ class BinanceService {
           high24h: parseFloat(ticker.highPrice),
           low24h: parseFloat(ticker.lowPrice),
         }));
+      
+      // Cache the successful result
+      this.cachedTradingPairs = pairs;
+      return pairs;
     } catch (error) {
       console.error('Failed to fetch trading pairs:', error);
       return [];
@@ -177,6 +200,14 @@ class BinanceService {
   subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
     if (this.wsConnections.has(symbol)) {
       console.log(`Already subscribed to ${symbol}`);
+  private cachedTradingPairs: TradingPair[] = [];
+
+  private getCachedTradingPairs(): TradingPair[] {
+    if (this.cachedTradingPairs.length > 0) {
+      return this.cachedTradingPairs;
+    }
+    return this.getMockTradingPairs();
+  }
       return;
     }
 
@@ -189,6 +220,16 @@ class BinanceService {
     };
 
     ws.onmessage = (event) => {
+      // Throttle WebSocket message processing to prevent resource overload
+      const now = Date.now();
+      const lastProcessed = this.wsMessageThrottle.get(symbol) || 0;
+      
+      if (now - lastProcessed < this.wsThrottleDelay) {
+        return; // Skip this message to prevent overload
+      }
+      
+      this.wsMessageThrottle.set(symbol, now);
+      
       try {
         const data = JSON.parse(event.data);
         const kline = data.k;
@@ -292,20 +333,52 @@ class BinanceService {
   }
 
   async getMarketData(symbol: string): Promise<MarketData | null> {
+    // Throttle market data requests per symbol
+    const now = Date.now();
+    const lastFetch = this.lastMarketDataFetch.get(symbol) || 0;
+    
+    if (now - lastFetch < this.marketDataThrottle) {
+      const cached = this.marketDataCache.get(symbol);
+      if (cached) {
+        return cached;
+      }
+    }
+
     // Return cached data if available
     const cached = this.marketDataCache.get(symbol);
     if (cached) {
       return cached;
     }
 
+    // Queue request if too many concurrent requests
+    if (this.activeRequests >= this.maxConcurrentRequests) {
+      return new Promise((resolve) => {
+        this.requestQueue.push(async () => {
+          const result = await this.fetchMarketDataInternal(symbol);
+          resolve(result);
+          return result;
+        });
+      });
+    }
+
+    return this.fetchMarketDataInternal(symbol);
+  }
+
+  private async fetchMarketDataInternal(symbol: string): Promise<MarketData | null> {
+    this.activeRequests++;
+    this.lastMarketDataFetch.set(symbol, Date.now());
+
     // Fallback to REST API if WebSocket data not available
     try {
-      const ticker = await this.makeRequest('/api/v3/ticker/24hr', { symbol });
-      const klines = await this.makeRequest('/api/v3/klines', {
-        symbol,
-        interval: '1m',
-        limit: 50
-      });
+      // Batch requests with retry mechanism
+      const [ticker, klines] = await Promise.all([
+        this.makeRequestWithRetry('/api/v3/ticker/24hr', { symbol }),
+        this.makeRequestWithRetry('/api/v3/klines', {
+          symbol,
+          interval: '1m',
+          limit: 50
+        })
+      ]);
 
       const prices = klines.map((k: any) => parseFloat(k[4]));
       const volumes = klines.map((k: any) => parseFloat(k[5]));
@@ -340,9 +413,47 @@ class BinanceService {
     } catch (error) {
       console.error('Failed to fetch market data:', error);
       return null;
+    } finally {
+      this.activeRequests--;
+      this.processRequestQueue();
     }
   }
 
+  private async processRequestQueue(): void {
+    if (this.requestQueue.length > 0 && this.activeRequests < this.maxConcurrentRequests) {
+      const nextRequest = this.requestQueue.shift();
+      if (nextRequest) {
+        await nextRequest();
+      }
+    }
+  }
+
+  private async makeRequestWithRetry(endpoint: string, params: any = {}, maxRetries: number = 3): Promise<any> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Add exponential backoff delay for retries
+        if (attempt > 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          console.log(`🔄 Retry attempt ${attempt} for ${endpoint} after ${delay}ms delay`);
+        }
+        
+        return await this.makeRequest(endpoint, params);
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`Request failed (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Don't retry on certain errors
+        if (error instanceof Error && error.message.includes('Forbidden')) {
+          throw error;
+        }
+      }
+    }
+    
+    throw lastError!;
+  }
   async getOpenPositions(): Promise<any[]> {
     if (!this.hasValidCredentials()) {
       return [];
