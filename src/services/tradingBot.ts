@@ -2,6 +2,7 @@ import { BotConfig, Portfolio, Position, Trade, MarketData } from '../types/trad
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
+import { adaptiveStrategy } from './adaptiveStrategy';
 
 class TradingBot {
   private config: BotConfig;
@@ -14,6 +15,7 @@ class TradingBot {
   private fastLearningTradeCount: number = 0;
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
+  private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
 
   constructor() {
     this.config = {
@@ -213,14 +215,30 @@ class TradingBot {
       // Apply learning insights to improve decision making
       const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
       
+      // Apply adaptive strategy analysis
+      const adaptiveDecision = adaptiveStrategy.shouldTrade(marketData);
+      
+      if (!adaptiveDecision.shouldTrade) {
+        console.log(`🚫 Adaptive strategy blocked trade: ${adaptiveDecision.reason}`);
+        return;
+      }
+      
+      // Combine signals with adaptive confidence
+      const finalConfidence = (enhancedSignal.confidence + adaptiveDecision.confidence) / 2;
+      const finalSignal = {
+        ...enhancedSignal,
+        confidence: finalConfidence,
+        reasoning: `${enhancedSignal.reasoning} | ${adaptiveDecision.reason}`
+      };
+      
       console.log(`🔍 ${marketData.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}, Sentiment: ${enhancedSignal.sentimentScore.toFixed(1)})`);
       
       // Fast learning trading logic
-      const shouldTrade = enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.3;
+      const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > (adaptiveDecision.strategy.entryThreshold * 0.8);
       const randomTrade = Math.random() < 0.1; // 10% chance of random trade
       
       if (shouldTrade || randomTrade) {
-        let action = enhancedSignal.action;
+        let action = finalSignal.action;
         
         // If random trade, pick random action
         if (randomTrade && !shouldTrade) {
@@ -229,7 +247,7 @@ class TradingBot {
         }
         
         console.log(`⚡ WebSocket Fast Learning Trade: ${action} ${marketData.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
-        await this.executeTrade(marketData.symbol, action, marketData, enhancedSignal);
+        await this.executeTrade(marketData.symbol, action, marketData, finalSignal, adaptiveDecision.strategy);
         
         this.fastLearningTradeCount++;
         this.lastFastLearningTrade = now;
@@ -420,10 +438,24 @@ class TradingBot {
           // Apply learning insights to improve decision making
           const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
           
+          // Apply adaptive strategy analysis
+          const adaptiveDecision = adaptiveStrategy.shouldTrade(marketData);
+          
+          if (!adaptiveDecision.shouldTrade) {
+            return; // Skip this pair
+          }
+          
+          // Combine signals
+          const finalConfidence = (enhancedSignal.confidence + adaptiveDecision.confidence) / 2;
+          const finalSignal = {
+            ...enhancedSignal,
+            confidence: finalConfidence
+          };
+          
           // More aggressive entry - lower confidence threshold
-          if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.6) {
-            console.log(`🎯 Trading signal: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
-            await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
+          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > adaptiveDecision.strategy.entryThreshold) {
+            console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
+            await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
         }));
         
@@ -460,6 +492,14 @@ class TradingBot {
       position.currentPrice = marketData.price;
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
+      
+      // Check multi-exit levels
+      const exitResult = this.checkMultiExitLevels(position, marketData.price);
+      if (exitResult.shouldExit) {
+        console.log(`${this.config.fastLearningMode ? '⚡' : '🔄'} Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
+        await this.closePositionInternal(position, exitResult.reason);
+        continue;
+      }
       
       // Much more aggressive exit conditions for fast learning
       const stopLossThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? -1.5 : -this.config.stopLossPercent * 100; // 1.5% stop loss in fast mode
@@ -505,16 +545,21 @@ class TradingBot {
     }
   }
 
-  private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any) {
+  private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
       console.log(`⚠️ Skipping ${symbol} - already have position`);
       return;
     }
     
-    // In fast learning mode, use smaller position sizes for more trades
-    const riskMultiplier = this.config.fastLearningMode ? 0.5 : 1; // 50% smaller positions in fast learning
-    const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * riskMultiplier;
+    // Apply adaptive risk sizing
+    const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
+    const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
+    const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
+    const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
+    
+    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier;
+    const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
     const quantity = riskAmount / marketData.price;
     
     if (quantity * marketData.price > this.portfolio.availableBalance) {
@@ -580,11 +625,19 @@ class TradingBot {
     this.portfolio.positions.push(position);
     this.activePositionIds.add(symbol);
     
+    // Set up multi-exit levels
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side);
+    this.multiExitPositions.set(position.id, {
+      tp1Hit: false,
+      tp2Hit: false,
+      trailingSL: exitLevels.sl
+    });
+    
     // Record trade for learning
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
-    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (${this.config.fastLearningMode ? 'FAST' : 'NORMAL'} mode)`);
+    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%)`);
   }
 
   private async closePositionInternal(position: Position, reason: string) {
@@ -624,9 +677,19 @@ class TradingBot {
     // Record position close for learning
     await learningService.recordPositionClose(position, trade, reason);
     
+    // Record for adaptive strategy learning
+    const originalTrade = this.portfolio.trades.find(t => t.id === position.id);
+    if (originalTrade) {
+      const marketData = await binanceService.getMarketData(position.symbol);
+      if (marketData) {
+        adaptiveStrategy.recordTradeOutcome(originalTrade, position, marketData);
+      }
+    }
+    
     // Remove position
     this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
     this.activePositionIds.delete(position.symbol);
+    this.multiExitPositions.delete(position.id);
     
     console.log(`Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
     return true;
@@ -660,6 +723,57 @@ class TradingBot {
     if (this.portfolio.positions.length > 0) {
       console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${positionsValue.toFixed(2)}, Invested: $${investedCapital.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
     }
+  }
+  
+  private checkMultiExitLevels(position: Position, currentPrice: number): { shouldExit: boolean; reason: string } {
+    const exitData = this.multiExitPositions.get(position.id);
+    if (!exitData) return { shouldExit: false, reason: '' };
+    
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
+    const isLong = position.side === 'LONG';
+    
+    // Check stop loss
+    if ((isLong && currentPrice <= exitData.trailingSL) || (!isLong && currentPrice >= exitData.trailingSL)) {
+      return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
+    }
+    
+    // Check take profit levels
+    if (!exitData.tp1Hit) {
+      if ((isLong && currentPrice >= exitLevels.tp1) || (!isLong && currentPrice <= exitLevels.tp1)) {
+        exitData.tp1Hit = true;
+        // Close 33% of position at TP1
+        console.log(`🎯 TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} (target: ${exitLevels.tp1.toFixed(2)})`);
+        // Update trailing stop to breakeven
+        exitData.trailingSL = position.entryPrice;
+        return { shouldExit: false, reason: 'TP1_PARTIAL' };
+      }
+    } else if (!exitData.tp2Hit) {
+      if ((isLong && currentPrice >= exitLevels.tp2) || (!isLong && currentPrice <= exitLevels.tp2)) {
+        exitData.tp2Hit = true;
+        // Close another 33% at TP2
+        console.log(`🎯 TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} (target: ${exitLevels.tp2.toFixed(2)})`);
+        // Update trailing stop to TP1
+        exitData.trailingSL = exitLevels.tp1;
+        return { shouldExit: false, reason: 'TP2_PARTIAL' };
+      }
+    } else {
+      // Both TP1 and TP2 hit, check TP3 for final exit
+      if ((isLong && currentPrice >= exitLevels.tp3) || (!isLong && currentPrice <= exitLevels.tp3)) {
+        return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
+      }
+      
+      // Update trailing stop if price moves favorably
+      const newTrailingSL = isLong 
+        ? Math.max(exitData.trailingSL, currentPrice * 0.985) // Trail 1.5% below current price
+        : Math.min(exitData.trailingSL, currentPrice * 1.015); // Trail 1.5% above current price
+      
+      if (newTrailingSL !== exitData.trailingSL) {
+        exitData.trailingSL = newTrailingSL;
+        console.log(`📈 Trailing stop updated for ${position.symbol}: ${newTrailingSL.toFixed(2)}`);
+      }
+    }
+    
+    return { shouldExit: false, reason: '' };
   }
 
   // Manual trading methods

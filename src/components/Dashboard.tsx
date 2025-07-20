@@ -12,6 +12,7 @@ import { TradesHistory } from './TradesHistory';
 import { BotSettings } from './BotSettings';
 import { useLanguage } from '../contexts/LanguageContext';
 import { learningService } from '../services/learningService';
+import { adaptiveStrategy } from '../services/adaptiveStrategy';
 
 export const Dashboard: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -21,6 +22,7 @@ export const Dashboard: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [learningStats, setLearningStats] = useState<any>(null);
+  const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
@@ -58,6 +60,19 @@ export const Dashboard: React.FC = () => {
   const updateLearningStats = () => {
     const stats = learningService.getLearningStats();
     setLearningStats(stats);
+    
+    const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
+    const patterns = adaptiveStrategy.getLearnedPatterns();
+    const reflections = adaptiveStrategy.getRecentReflections();
+    
+    setAdaptiveStats({
+      riskLevel: (adaptiveRisk.currentRiskLevel * 100).toFixed(0),
+      winRate: (adaptiveRisk.recentWinRate * 100).toFixed(1),
+      consecutiveLosses: adaptiveRisk.consecutiveLosses,
+      learnedPatterns: patterns.length,
+      lastReflection: reflections.length > 0 ? reflections[reflections.length - 1].reflection : 'No reflections yet',
+      inCooldown: Date.now() < adaptiveRisk.lastCooldownEnd
+    });
   };
 
   const handleStartStop = () => {
@@ -246,26 +261,58 @@ export const Dashboard: React.FC = () => {
             )}
             
             {activeTab === 'overview' && learningStats && (
-              <div className="mt-6 bg-blue-50 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2">🧠 AI Learning Status</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-600">Total Trades:</span>
-                    <div className="font-medium">{learningStats.totalTrades}</div>
-                  </div>
-                  <div>
-                    <span className="text-blue-600">Win Rate:</span>
-                    <div className="font-medium">{learningStats.winRate}%</div>
-                  </div>
-                  <div>
-                    <span className="text-blue-600">Avg Profit:</span>
-                    <div className="font-medium">{learningStats.avgProfit}%</div>
-                  </div>
-                  <div>
-                    <span className="text-blue-600">Last Update:</span>
-                    <div className="font-medium text-xs">{learningStats.lastLearningUpdate}</div>
+              <div className="mt-6 space-y-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2">🧠 AI Learning Status</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-blue-600">Total Trades:</span>
+                      <div className="font-medium">{learningStats.totalTrades}</div>
+                    </div>
+                    <div>
+                      <span className="text-blue-600">Win Rate:</span>
+                      <div className="font-medium">{learningStats.winRate}%</div>
+                    </div>
+                    <div>
+                      <span className="text-blue-600">Avg Profit:</span>
+                      <div className="font-medium">{learningStats.avgProfit}%</div>
+                    </div>
+                    <div>
+                      <span className="text-blue-600">Last Update:</span>
+                      <div className="font-medium text-xs">{learningStats.lastLearningUpdate}</div>
+                    </div>
                   </div>
                 </div>
+                
+                {adaptiveStats && (
+                  <div className={`rounded-lg p-4 ${adaptiveStats.inCooldown ? 'bg-red-50' : 'bg-green-50'}`}>
+                    <h4 className={`font-semibold mb-2 ${adaptiveStats.inCooldown ? 'text-red-900' : 'text-green-900'}`}>
+                      🎯 Adaptive Strategy Status {adaptiveStats.inCooldown ? '(COOLDOWN)' : ''}
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                      <div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Risk Level:</span>
+                        <div className="font-medium">{adaptiveStats.riskLevel}%</div>
+                      </div>
+                      <div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Recent Win Rate:</span>
+                        <div className="font-medium">{adaptiveStats.winRate}%</div>
+                      </div>
+                      <div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Consecutive Losses:</span>
+                        <div className="font-medium">{adaptiveStats.consecutiveLosses}</div>
+                      </div>
+                      <div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Learned Patterns:</span>
+                        <div className="font-medium">{adaptiveStats.learnedPatterns}</div>
+                      </div>
+                    </div>
+                    <div className="text-xs">
+                      <span className={`font-medium ${adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}`}>Latest Reflection:</span>
+                      <div className="mt-1 text-gray-700 italic">{adaptiveStats.lastReflection}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
