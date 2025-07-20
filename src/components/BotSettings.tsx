@@ -316,6 +316,32 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               </div>
             </div>
             
+            {/* Adaptive Strategy Confidence Threshold Slider */}
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('adaptiveConfidenceThreshold')} ({(formData.adaptiveConfidenceThreshold * 100).toFixed(0)}%)
+                </label>
+                <div className="text-sm text-gray-600 mb-3">
+                  {t('adaptiveConfidenceThresholdDescription')}
+                </div>
+                <input
+                  type="range"
+                  min="0.50"
+                  max="0.95"
+                  step="0.01"
+                  value={formData.adaptiveConfidenceThreshold}
+                  onChange={(e) => handleChange('adaptiveConfidenceThreshold', parseFloat(e.target.value))}
+                  disabled={!formData.adaptiveStrategyEnabled}
+                  className={`w-full ${!formData.adaptiveStrategyEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>50%</span>
+                  <span>95%</span>
+                </div>
+              </div>
+            </div>
+            
             {/* Reset AI Learning */}
             <div className="p-4 rounded-lg border-2 border-gray-300">
               <div className="mb-4">

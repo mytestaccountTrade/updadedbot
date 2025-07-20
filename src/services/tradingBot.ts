@@ -30,6 +30,7 @@ class TradingBot {
       enableNewsTrading: true,
       enableTechnicalAnalysis: true,
       confidenceThreshold: 0.80, // Default 80% confidence threshold
+      adaptiveConfidenceThreshold: 0.80, // Default 80% adaptive confidence threshold
     };
 
     this.portfolio = {
@@ -222,7 +223,12 @@ class TradingBot {
       
       // Apply adaptive strategy analysis
       const adaptiveDecision = this.config.adaptiveStrategyEnabled 
-        ? adaptiveStrategy.shouldTrade(marketData)
+      
+      // Log adaptive threshold for debugging
+      if (this.config.adaptiveStrategyEnabled) {
+        console.log(`🎯 Adaptive threshold: ${this.config.adaptiveConfidenceThreshold}, Decision confidence: ${adaptiveDecision.confidence.toFixed(3)}`);
+      }
+        ? adaptiveStrategy.shouldTrade(marketData, this.config.adaptiveConfidenceThreshold)
         : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
       
       // Log confidence threshold for debugging
@@ -451,7 +457,9 @@ class TradingBot {
           const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
           
           // Apply adaptive strategy analysis
-          const adaptiveDecision = adaptiveStrategy.shouldTrade(marketData);
+          const adaptiveDecision = this.config.adaptiveStrategyEnabled 
+            ? adaptiveStrategy.shouldTrade(marketData, this.config.adaptiveConfidenceThreshold)
+            : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
           
           if (!adaptiveDecision.shouldTrade) {
             return; // Skip this pair

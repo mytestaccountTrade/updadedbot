@@ -96,6 +96,8 @@ export const translations = {
     resetAllBotData: 'Reset All Bot Data (including trade history and stats)',
     confidenceThreshold: 'Confidence Threshold',
     confidenceThresholdDescription: 'Minimum confidence required for AI-based trades (only when Adaptive Strategy is enabled)',
+    adaptiveConfidenceThreshold: 'Adaptive Strategy Confidence Threshold',
+    adaptiveConfidenceThresholdDescription: 'Minimum confidence required for adaptive strategy trade decisions',
     
     // Sentiment
     bullish: 'BULLISH',
@@ -211,6 +213,8 @@ export const translations = {
     resetAllBotData: 'Tüm Bot Verilerini Sıfırla (ticaret geçmişi ve istatistikler dahil)',
     confidenceThreshold: 'Güven Eşiği',
     confidenceThresholdDescription: 'AI tabanlı işlemler için gereken minimum güven (sadece Uyarlanabilir Strateji etkinken)',
+    adaptiveConfidenceThreshold: 'Uyarlanabilir Strateji Güven Eşiği',
+    adaptiveConfidenceThresholdDescription: 'Uyarlanabilir strateji ticaret kararları için gereken minimum güven',
     
     // Sentiment
     bullish: 'YÜKSELIŞ',

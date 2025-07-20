@@ -201,7 +201,7 @@ class AdaptiveStrategyService {
     return adjustedStrategy;
   }
 
-  calculateSignalConfidence(marketData: MarketData, marketCondition: MarketCondition): number {
+  calculateSignalConfidence(marketData: MarketData, marketCondition: MarketCondition, confidenceThreshold: number = 0.8): number {
     const { rsi, macd, volumeRatio, emaTrend } = marketData;
     let confidence = 0.5;
     let indicatorCount = 0;
@@ -307,7 +307,7 @@ class AdaptiveStrategyService {
     );
   }
 
-  shouldTrade(marketData: MarketData): { shouldTrade: boolean; reason: string; confidence: number; strategy: TradingStrategy } {
+  shouldTrade(marketData: MarketData, confidenceThreshold: number = 0.8): { shouldTrade: boolean; reason: string; confidence: number; strategy: TradingStrategy } {
     // Check cooldown
     if (Date.now() < this.riskMetrics.lastCooldownEnd) {
       return {
@@ -320,7 +320,7 @@ class AdaptiveStrategyService {
 
     const marketCondition = this.analyzeMarketCondition(marketData);
     const strategy = this.selectOptimalStrategy(marketCondition);
-    const confidence = this.calculateSignalConfidence(marketData, marketCondition);
+    const confidence = this.calculateSignalConfidence(marketData, marketCondition, confidenceThreshold);
 
     // Time-based restrictions
     if (marketCondition.timeOfDay === 'OVERNIGHT' && marketCondition.type === 'UNCERTAIN') {
@@ -333,10 +333,10 @@ class AdaptiveStrategyService {
     }
 
     // Confidence threshold check
-    if (confidence < strategy.entryThreshold) {
+    if (confidence < confidenceThreshold) {
       return {
         shouldTrade: false,
-        reason: `Confidence ${confidence.toFixed(2)} below threshold ${strategy.entryThreshold}`,
+        reason: `Confidence ${confidence.toFixed(2)} below adaptive threshold ${confidenceThreshold.toFixed(2)}`,
         confidence,
         strategy
       };
@@ -620,19 +620,17 @@ class AdaptiveStrategyService {
     // Reset learned patterns
     this.learnedPatterns = [];
     
-    // Reset risk metrics to defaults (but keep total trade count)
-    const totalTrades = this.riskMetrics.totalTrades;
-    const profitableTrades = this.riskMetrics.profitableTrades;
+    // Reset risk metrics to defaults completely
     this.riskMetrics = {
       recentWinRate: 0.5,
       consecutiveLosses: 0,
       currentRiskLevel: 1.0,
       lastCooldownEnd: 0,
-      totalTrades,
-      profitableTrades
+      totalTrades: 0,
+      profitableTrades: 0
     };
     
-    // Clear recent trades for fresh learning
+    // Clear all trade memory for fresh learning
     this.recentTrades = [];
     
     // Clear trade reflections

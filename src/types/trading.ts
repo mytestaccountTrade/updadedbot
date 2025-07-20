@@ -67,6 +67,7 @@ export interface BotConfig {
   enableNewsTrading: boolean;
   enableTechnicalAnalysis: boolean;
   confidenceThreshold: number;
+  adaptiveConfidenceThreshold: number;
   apiKey?: string;
   apiSecret?: string;
   llama3Url?: string;
