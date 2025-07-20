@@ -180,6 +180,78 @@ class TradingBot {
     }
   }
 
+  private async executeWebSocketFastLearning(marketData: MarketData) {
+    try {
+      const now = Date.now();
+      
+      // Minimum 500ms between trades to prevent spam
+      if (now - this.lastFastLearningTrade < 500) {
+        return;
+      }
+      
+      console.log(`⚡ WebSocket Fast Learning: ${marketData.symbol} - Price: $${marketData.price.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}`);
+      
+      // Skip if we already have a position in this symbol
+      if (this.activePositionIds.has(marketData.symbol)) {
+        return;
+      }
+      
+      // Skip if we're at max positions
+      if (this.portfolio.positions.length >= this.config.maxPositions) {
+        return;
+      }
+      
+      // Get news for signal generation
+      const news = newsService.getLatestNews();
+      
+      // Generate trading signal
+      const signal = await newsService.generateTradingSignal(marketData.symbol, marketData, news);
+      
+      // Get learning insights
+      const learningInsights = await learningService.getMarketInsights();
+      
+      // Apply learning insights to improve decision making
+      const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+      
+      console.log(`🔍 ${marketData.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}, Sentiment: ${enhancedSignal.sentimentScore.toFixed(1)})`);
+      
+      // Fast learning trading logic
+      const shouldTrade = enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.3;
+      const randomTrade = Math.random() < 0.1; // 10% chance of random trade
+      
+      if (shouldTrade || randomTrade) {
+        let action = enhancedSignal.action;
+        
+        // If random trade, pick random action
+        if (randomTrade && !shouldTrade) {
+          action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+          console.log(`🎲 Random exploration trade: ${action} ${marketData.symbol}`);
+        }
+        
+        console.log(`⚡ WebSocket Fast Learning Trade: ${action} ${marketData.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
+        await this.executeTrade(marketData.symbol, action, marketData, enhancedSignal);
+        
+        this.fastLearningTradeCount++;
+        this.lastFastLearningTrade = now;
+        
+        // Log detailed trade information
+        console.log(`📊 Trade Details: RSI: ${marketData.rsi.toFixed(1)}, MACD: ${marketData.macd.toFixed(4)}, EMA Trend: ${marketData.emaTrend}, Confidence: ${enhancedSignal.confidence.toFixed(2)}`);
+        console.log(`💰 Portfolio: $${this.portfolio.totalValue.toFixed(2)} total, $${this.portfolio.availableBalance.toFixed(2)} available, ${this.portfolio.positions.length}/${this.config.maxPositions} positions`);
+        
+        // Trigger learning every 3-5 trades (randomized)
+        const retrainInterval = 3 + Math.floor(Math.random() * 3); // 3-5 trades
+        if (this.fastLearningTradeCount % retrainInterval === 0) {
+          console.log(`🧠 Fast Learning: Triggering retraining after ${this.fastLearningTradeCount} trades...`);
+          console.log(`📊 Portfolio: $${this.portfolio.totalValue.toFixed(2)} total, $${this.portfolio.totalPnl.toFixed(2)} P&L, ${this.portfolio.positions.length} positions`);
+          await learningService.retrainModel();
+        }
+      }
+      
+    } catch (error) {
+      console.error(`WebSocket Fast Learning error for ${marketData.symbol}:`, error);
+    }
+  }
+
   private async syncRealPositions() {
     if (this.config.mode !== 'REAL') return;
     
