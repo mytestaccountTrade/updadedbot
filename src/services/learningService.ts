@@ -199,11 +199,21 @@ class LearningService {
       return signal;
     }
 
+    const isFastLearning = (globalThis as any).fastLearningMode === true;
+
     // First check against learned patterns
     const patternResult = this.checkLearnedPatterns(signal, marketData, insights);
     if (patternResult.modified) {
       console.log(`🧠 Pattern-based signal modification: ${signal.action} → ${patternResult.signal.action} (${patternResult.reason})`);
       return patternResult.signal;
+    }
+
+    // Enhanced learning influence for fast learning mode
+    if (isFastLearning) {
+      const enhancedSignal = this.applyFastLearningEnhancements(signal, marketData, insights);
+      if (enhancedSignal.modified) {
+        return enhancedSignal.signal;
+      }
     }
 
     try {
@@ -225,6 +235,58 @@ Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why
       console.log('LLaMA 3 enhancement failed, using original signal');
       return signal;
     }
+  }
+
+  private applyFastLearningEnhancements(signal: any, marketData: MarketData, insights: LearningInsights): { modified: boolean; signal: any } {
+    let confidence = signal.confidence;
+    let reasoning = signal.reasoning;
+    let modified = false;
+    
+    // Find similar profitable trades
+    const similarTrades = this.tradeHistory.filter(trade => {
+      if (!trade.indicators || !trade.exitPrice) return false;
+      
+      const rsiSimilar = Math.abs((trade.indicators.rsi || 50) - marketData.rsi) < 15;
+      const macdSimilar = Math.abs((trade.indicators.macd || 0) - marketData.macd) < 0.01;
+      
+      return rsiSimilar && macdSimilar && trade.outcome === 'PROFIT';
+    });
+    
+    if (similarTrades.length >= 2) {
+      confidence += 0.2;
+      reasoning += ' (Similar profitable setups found)';
+      modified = true;
+    }
+    
+    // Volume ratio bonus
+    if (marketData.volumeRatio > 1.5) {
+      confidence += 0.15;
+      reasoning += ' (High volume support)';
+      modified = true;
+    }
+    
+    // Bollinger band edge bonus
+    if (marketData.bollinger) {
+      const price = marketData.price;
+      const { upper, lower } = marketData.bollinger;
+      
+      if (price < lower * 1.02 && signal.action === 'BUY') {
+        confidence += 0.2;
+        reasoning += ' (Near Bollinger lower band)';
+        modified = true;
+      } else if (price > upper * 0.98 && signal.action === 'SELL') {
+        confidence += 0.2;
+        reasoning += ' (Near Bollinger upper band)';
+        modified = true;
+      }
+    }
+    
+    confidence = Math.min(0.95, confidence);
+    
+    return {
+      modified,
+      signal: modified ? { ...signal, confidence, reasoning } : signal
+    };
   }
 
   private checkLearnedPatterns(signal: any, marketData: MarketData, insights: LearningInsights): { modified: boolean; signal: any; reason: string } {
@@ -514,10 +576,23 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   private async fineTuneLlama3(trades: TradeRecord[]) {
     try {
       // Create training dataset from successful trades
-      const validTrades = trades
-        .filter(t => t.outcome === 'PROFIT')
-        .filter(t => t.indicators && typeof t.indicators.rsi === 'number')
-        .filter(t => t.marketDataSnapshot && typeof t.marketDataSnapshot.price === 'number');
+      const validTrades = trades.filter(t => {
+        // Ensure basic trade data exists
+        if (!t.outcome || !t.indicators || !t.marketDataSnapshot) return false;
+        
+        // Ensure indicators have valid values with fallbacks
+        const indicators = {
+          rsi: typeof t.indicators.rsi === 'number' ? t.indicators.rsi : 50,
+          macd: typeof t.indicators.macd === 'number' ? t.indicators.macd : 0,
+          emaTrend: t.indicators.emaTrend || 'NEUTRAL',
+          volumeRatio: typeof t.indicators.volumeRatio === 'number' ? t.indicators.volumeRatio : 1
+        };
+        
+        // Update the trade with safe indicators
+        t.indicators = { ...t.indicators, ...indicators };
+        
+        return t.outcome === 'PROFIT' && typeof t.marketDataSnapshot.price === 'number';
+      });
       
       if (validTrades.length === 0) {
         console.log('No valid trades for fine-tuning');
@@ -526,7 +601,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       
       const trainingData = validTrades
         .map(t => ({
-          input: `Market: RSI ${t.indicators.rsi}, MACD ${t.indicators.macd}, EMA Trend ${t.indicators.emaTrend}, Sentiment ${t.sentimentScore}`,
+          input: `Market: RSI ${t.indicators.rsi || 50}, MACD ${(t.indicators.macd || 0).toFixed(4)}, EMA Trend ${t.indicators.emaTrend || 'NEUTRAL'}, Sentiment ${t.sentimentScore || 0}`,
           output: `Action: ${t.action}, Confidence: ${t.confidence}, Result: ${t.profitPercent?.toFixed(2)}% profit`
         }));
 
@@ -625,10 +700,45 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     const patterns: string[] = [];
     
     trades.forEach(trade => {
-      // Add null checks for indicators
-      if (trade.indicators && typeof trade.indicators.rsi === 'number') {
-        if (trade.indicators.rsi < 30) patterns.push('RSI_OVERSOLD');
-        if (trade.indicators.rsi > 70) patterns.push('RSI_OVERBOUGHT');
+      // Safe indicator access with fallbacks
+      const indicators = trade.indicators || {};
+      const rsi = typeof indicators.rsi === 'number' ? indicators.rsi : 50;
+      const macd = typeof indicators.macd === 'number' ? indicators.macd : 0;
+      const emaTrend = indicators.emaTrend || 'NEUTRAL';
+      const sentimentScore = typeof trade.sentimentScore === 'number' ? trade.sentimentScore : 0;
+      
+      // RSI patterns
+      if (rsi < 30) patterns.push('RSI_OVERSOLD');
+      if (rsi > 70) patterns.push('RSI_OVERBOUGHT');
+      
+      // MACD patterns
+      if (macd > 0) patterns.push('MACD_POSITIVE');
+      if (macd < 0) patterns.push('MACD_NEGATIVE');
+      
+      // EMA trend patterns
+      if (emaTrend === 'BULLISH') patterns.push('EMA_BULLISH');
+      if (emaTrend === 'BEARISH') patterns.push('EMA_BEARISH');
+      
+      // Sentiment patterns
+      if (sentimentScore > 0.5) patterns.push('SENTIMENT_POSITIVE');
+      if (sentimentScore < -0.5) patterns.push('SENTIMENT_NEGATIVE');
+      
+      // Bollinger patterns
+      if (indicators.bollingerPosition === 'LOWER') patterns.push('BOLLINGER_LOWER');
+      if (indicators.bollingerPosition === 'UPPER') patterns.push('BOLLINGER_UPPER');
+    });
+    
+    // Return most common patterns
+    const patternCounts = patterns.reduce((acc, pattern) => {
+      acc[pattern] = (acc[pattern] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(patternCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([pattern]) => pattern);
+  }
       }
       
       if (trade.indicators && typeof trade.indicators.macd === 'number') {
@@ -698,9 +808,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private analyzeMarketConditions(trades: TradeRecord[]): LearningInsights['marketConditions'] {
-    const bullish = trades.filter(t => t.indicators && t.indicators.emaTrend === 'BULLISH');
-    const bearish = trades.filter(t => t.indicators && t.indicators.emaTrend === 'BEARISH');
-    const neutral = trades.filter(t => t.indicators && t.indicators.emaTrend === 'NEUTRAL');
+    const bullish = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'BULLISH');
+    const bearish = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'BEARISH');
+    const neutral = trades.filter(t => (t.indicators?.emaTrend || 'NEUTRAL') === 'NEUTRAL');
 
     return {
       bullish: {
@@ -727,12 +837,12 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     else if (price < bollinger.lower) bollingerPosition = 'LOWER';
     
     return {
-      rsi: marketData.rsi || 50,
-      macd: marketData.macd || 0,
-      ema12: marketData.ema12 || 0,
-      ema26: marketData.ema26 || 0,
+      rsi: typeof marketData.rsi === 'number' ? marketData.rsi : 50,
+      macd: typeof marketData.macd === 'number' ? marketData.macd : 0,
+      ema12: typeof marketData.ema12 === 'number' ? marketData.ema12 : price,
+      ema26: typeof marketData.ema26 === 'number' ? marketData.ema26 : price,
       emaTrend: marketData.emaTrend || 'NEUTRAL',
-      volumeRatio: marketData.volumeRatio || 1,
+      volumeRatio: typeof marketData.volumeRatio === 'number' ? marketData.volumeRatio : 1,
       bollingerPosition,
     };
   }

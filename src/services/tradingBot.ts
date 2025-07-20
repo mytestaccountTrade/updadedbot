@@ -96,6 +96,10 @@ class TradingBot {
     if (this.isRunning) return;
     
     this.isRunning = true;
+    
+    // Set global flag for fast learning mode
+    (globalThis as any).fastLearningMode = this.config.fastLearningMode;
+    
     console.log(`Trading bot started in ${this.config.mode} mode`);
     
     // Subscribe to WebSocket data for top trading pairs
@@ -229,12 +233,12 @@ class TradingBot {
             price: pair.price,
             timestamp: Date.now(),
             volume: pair.volume,
-            rsi: 45 + (Math.random() * 20), // Random RSI between 45-65
+            rsi: 40 + (Math.random() * 30), // Random RSI between 40-70 for more signals
             macd: (Math.random() - 0.5) * 0.01, // Small random MACD
             ema12: pair.price * (1 + (Math.random() - 0.5) * 0.02),
             ema26: pair.price * (1 + (Math.random() - 0.5) * 0.02),
-            emaTrend: Math.random() > 0.5 ? 'BULLISH' : 'BEARISH' as 'BULLISH' | 'BEARISH',
-            volumeRatio: 0.8 + (Math.random() * 0.4), // 0.8 to 1.2
+            emaTrend: Math.random() > 0.33 ? (Math.random() > 0.5 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL' as 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+            volumeRatio: 0.5 + (Math.random() * 2), // 0.5 to 2.5 for more variety
             bollinger: {
               upper: pair.price * 1.02,
               middle: pair.price,
@@ -248,9 +252,9 @@ class TradingBot {
         
         console.log(`🔍 ${pair.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)})`);
         
-        // Much lower confidence threshold for fast learning + random trades for exploration
-        const shouldTrade = enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.3;
-        const randomTrade = Math.random() < 0.1; // 10% chance of random trade for exploration
+        // Much lower confidence threshold for fast learning + more random trades
+        const shouldTrade = enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.2;
+        const randomTrade = Math.random() < 0.3; // 30% chance of random trade for exploration
         
         if (shouldTrade || randomTrade) {
           let action = enhancedSignal.action;
@@ -261,7 +265,7 @@ class TradingBot {
             console.log(`🎲 Random exploration trade: ${action} ${pair.symbol}`);
           }
           
-          console.log(`⚡ Fast Learning Trade: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
+          console.log(`⚡ Fast Learning Trade: ${action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
           await this.executeTrade(pair.symbol, action, marketData, enhancedSignal);
           this.fastLearningTradeCount++;
           

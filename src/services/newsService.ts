@@ -129,7 +129,7 @@ class NewsService {
     sentimentScore: number;
   }> {
     try {
-      const relevantNews = news.filter(item => item.coins.includes(symbol.replace('USDT', '')));
+      const relevantNews = this.getRelevantNews(news, symbol);
       const sentimentScore = this.calculateSentimentScore(relevantNews);
       
       // Try to use local Llama 3 for trading signal generation
@@ -177,17 +177,29 @@ Respond with: ACTION CONFIDENCE REASONING`;
       // Fallback analysis
       const technicalScore = this.calculateTechnicalScore(marketData);
       const newsScore = sentimentScore;
-      const combinedScore = (technicalScore * 0.6) + (newsScore * 0.4);
+      
+      // Enhanced scoring for fast learning mode
+      const isFastLearning = this.isFastLearningMode();
+      let combinedScore = (technicalScore * 0.6) + (newsScore * 0.4);
+      
+      // Apply fast learning enhancements
+      if (isFastLearning) {
+        combinedScore = this.enhanceScoreForFastLearning(combinedScore, marketData, sentimentScore);
+      }
 
       let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
       let confidence = 0.5;
       let reasoning = 'Market conditions are neutral';
 
-      if (combinedScore > 0.3) {
+      // Looser thresholds for fast learning
+      const buyThreshold = isFastLearning ? 0.15 : 0.3;
+      const sellThreshold = isFastLearning ? -0.15 : -0.3;
+      
+      if (combinedScore > buyThreshold) {
         action = 'BUY';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
         reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
-      } else if (combinedScore < -0.3) {
+      } else if (combinedScore < sellThreshold) {
         action = 'SELL';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
         reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
@@ -198,6 +210,79 @@ Respond with: ACTION CONFIDENCE REASONING`;
       console.error('Trading signal generation failed:', error);
       return { action: 'HOLD', confidence: 0.5, reasoning: 'Analysis failed', sentimentScore: 0 };
     }
+  }
+
+  private isFastLearningMode(): boolean {
+    // Check if we're in fast learning mode - this would be passed from the trading bot
+    return (globalThis as any).fastLearningMode === true;
+  }
+
+  private getRelevantNews(news: NewsItem[], symbol: string): NewsItem[] {
+    const baseSymbol = symbol.replace('USDT', '').replace('BUSD', '');
+    const isFastLearning = this.isFastLearningMode();
+    
+    if (!isFastLearning) {
+      // Normal mode - strict matching
+      return news.filter(item => item.coins.includes(baseSymbol));
+    }
+    
+    // Fast learning mode - loose matching
+    return news.filter(item => {
+      const text = `${item.title} ${item.content}`.toLowerCase();
+      
+      // Direct symbol match
+      if (item.coins.includes(baseSymbol)) return true;
+      
+      // Popular pairs get general crypto sentiment
+      const popularPairs = ['BTC', 'ETH', 'BNB', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX'];
+      if (popularPairs.includes(baseSymbol)) {
+        return text.includes('crypto') || text.includes('coin') || text.includes('market') || 
+               text.includes('bullish') || text.includes('bearish') || text.includes('bitcoin') || 
+               text.includes('ethereum') || text.includes('trading');
+      }
+      
+      return false;
+    });
+  }
+
+  private enhanceScoreForFastLearning(score: number, marketData: any, sentimentScore: number): number {
+    let enhancedScore = score;
+    
+    // Boost based on sentiment strength
+    if (sentimentScore > 0.4) {
+      enhancedScore += 0.2; // Slight BUY boost
+    }
+    if (sentimentScore > 0.6) {
+      enhancedScore += 0.3; // Strong BUY boost
+    }
+    if (sentimentScore < -0.4) {
+      enhancedScore -= 0.2; // Slight SELL boost
+    }
+    if (sentimentScore < -0.6) {
+      enhancedScore -= 0.3; // Strong SELL boost
+    }
+    
+    // Bollinger band proximity bonus
+    if (marketData.bollinger && marketData.price) {
+      const price = marketData.price;
+      const { upper, lower, middle } = marketData.bollinger;
+      
+      // Near lower band - potential BUY
+      if (price < lower * 1.02) {
+        enhancedScore += 0.25;
+      }
+      // Near upper band - potential SELL
+      if (price > upper * 0.98) {
+        enhancedScore -= 0.25;
+      }
+    }
+    
+    // Volume boost
+    if (marketData.volumeRatio > 1.5) {
+      enhancedScore += 0.15;
+    }
+    
+    return enhancedScore;
   }
 
   private calculateSentimentScore(news: NewsItem[]): number {
@@ -246,15 +331,33 @@ Respond with: ACTION CONFIDENCE REASONING`;
   private calculateTechnicalScore(marketData: any): number {
     if (!marketData) return 0;
 
+    const isFastLearning = this.isFastLearningMode();
     let score = 0;
     
-    // RSI analysis
-    if (marketData.rsi < 30) score += 0.5; // Oversold
-    else if (marketData.rsi > 70) score -= 0.5; // Overbought
+    // RSI analysis - looser thresholds for fast learning
+    if (isFastLearning) {
+      // More aggressive RSI signals for fast learning
+      if (marketData.rsi < 45) score += 0.4; // Earlier oversold signal
+      else if (marketData.rsi > 55) score -= 0.4; // Earlier overbought signal
+      
+      // Additional signals in the middle range
+      if (marketData.rsi >= 45 && marketData.rsi <= 50) score += 0.2; // Mild bullish
+      if (marketData.rsi >= 50 && marketData.rsi <= 55) score -= 0.2; // Mild bearish
+    } else {
+      // Normal mode - strict thresholds
+      if (marketData.rsi < 30) score += 0.5; // Oversold
+      else if (marketData.rsi > 70) score -= 0.5; // Overbought
+    }
     
-    // MACD analysis
-    if (marketData.macd > 0) score += 0.3;
-    else score -= 0.3;
+    // MACD analysis - accept weaker signals in fast learning
+    if (isFastLearning) {
+      // Accept any MACD direction as signal
+      if (marketData.macd > -0.001) score += 0.25; // Very weak positive
+      else score -= 0.25;
+    } else {
+      if (marketData.macd > 0) score += 0.3;
+      else score -= 0.3;
+    }
     
     // Bollinger Bands analysis
     if (marketData.bollinger && marketData.price < marketData.bollinger.lower) score += 0.4;
