@@ -512,14 +512,62 @@ class AdaptiveStrategyService {
     }
   }
 
-  getMultiExitLevels(entryPrice: number, side: 'LONG' | 'SHORT'): { tp1: number; tp2: number; tp3: number; sl: number } {
+  getMultiExitLevels(entryPrice: number, side: 'LONG' | 'SHORT', marketCondition?: any): { tp1: number; tp2: number; tp3: number; sl: number } {
     const multiplier = side === 'LONG' ? 1 : -1;
     
+    // Base levels
+    let tp1Pct = 0.01;   // 1%
+    let tp2Pct = 0.025;  // 2.5%
+    let tp3Pct = 0.05;   // 5%
+    let slPct = 0.015;   // 1.5%
+    
+    // Adjust based on market condition
+    if (marketCondition) {
+      switch (marketCondition.type) {
+        case 'HIGH_VOLATILITY':
+          // Wider targets and stops for volatile markets
+          tp1Pct = 0.015; // 1.5%
+          tp2Pct = 0.035; // 3.5%
+          tp3Pct = 0.07;  // 7%
+          slPct = 0.025;  // 2.5%
+          break;
+        case 'SIDEWAYS':
+          // Tighter targets for range-bound markets
+          tp1Pct = 0.008; // 0.8%
+          tp2Pct = 0.015; // 1.5%
+          tp3Pct = 0.025; // 2.5%
+          slPct = 0.01;   // 1%
+          break;
+        case 'TRENDING_UP':
+        case 'TRENDING_DOWN':
+          // Let winners run in trending markets
+          tp1Pct = 0.012; // 1.2%
+          tp2Pct = 0.03;  // 3%
+          tp3Pct = 0.08;  // 8%
+          slPct = 0.012;  // 1.2%
+          break;
+        case 'UNCERTAIN':
+          // Conservative targets in uncertain markets
+          tp1Pct = 0.008; // 0.8%
+          tp2Pct = 0.018; // 1.8%
+          tp3Pct = 0.035; // 3.5%
+          slPct = 0.012;  // 1.2%
+          break;
+      }
+      
+      // Adjust for volatility
+      const volatilityMultiplier = Math.max(0.7, Math.min(1.5, marketCondition.volatility * 25));
+      tp1Pct *= volatilityMultiplier;
+      tp2Pct *= volatilityMultiplier;
+      tp3Pct *= volatilityMultiplier;
+      slPct *= volatilityMultiplier;
+    }
+    
     return {
-      tp1: entryPrice * (1 + (0.01 * multiplier)),  // 1%
-      tp2: entryPrice * (1 + (0.025 * multiplier)), // 2.5%
-      tp3: entryPrice * (1 + (0.05 * multiplier)),  // 5%
-      sl: entryPrice * (1 - (0.015 * multiplier))   // -1.5%
+      tp1: entryPrice * (1 + (tp1Pct * multiplier)),
+      tp2: entryPrice * (1 + (tp2Pct * multiplier)),
+      tp3: entryPrice * (1 + (tp3Pct * multiplier)),
+      sl: entryPrice * (1 - (slPct * multiplier))
     };
   }
 

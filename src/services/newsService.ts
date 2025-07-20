@@ -138,15 +138,21 @@ class NewsService {
       const relevantNews = this.getRelevantNews(news, symbol);
       const sentimentScore = this.calculateSentimentScore(relevantNews);
       
+      // Get market condition for context
+      const marketCondition = this.analyzeMarketCondition(marketData);
+      
       // Try to use local Llama 3 for trading signal generation
       try {
         if (await this.isLlama3Available()) {
-        const prompt = `Given RSI: ${marketData.rsi?.toFixed(2)}, EMA Trend: ${marketData.emaTrend}, and News Sentiment: ${sentimentScore.toFixed(2)}, should we BUY, SELL or HOLD? Explain why.
+        const prompt = `Market Analysis for ${symbol}:
+RSI: ${marketData.rsi?.toFixed(2)}
+EMA Trend: ${marketData.emaTrend}
+MACD: ${marketData.macd?.toFixed(4)}
+Volume Ratio: ${marketData.volumeRatio?.toFixed(2)}
+Market Condition: ${marketCondition.type}
+News Sentiment: ${sentimentScore.toFixed(2)}
 
-Additional context:
-- Price: ${marketData.price}
-- Volume Ratio: ${marketData.volumeRatio?.toFixed(2)}
-- MACD: ${marketData.macd?.toFixed(4)}
+Should we BUY, SELL or HOLD? Consider market regime and risk.
 
 Respond with: ACTION CONFIDENCE REASONING`;
 
@@ -163,7 +169,12 @@ Respond with: ACTION CONFIDENCE REASONING`;
             const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.6;
             const reasoning = result.replace(/(BUY|SELL|HOLD)/, '').replace(/\d+\.?\d*/, '').trim();
             
-            return { action, confidence, reasoning: reasoning || 'AI analysis', sentimentScore };
+            return { 
+              action, 
+              confidence: this.adjustConfidenceForMarketCondition(confidence, marketCondition), 
+              reasoning: reasoning || 'AI analysis', 
+              sentimentScore 
+            };
           }
           }
         }
@@ -178,12 +189,15 @@ Respond with: ACTION CONFIDENCE REASONING`;
       
       // Enhanced scoring for fast learning mode
       const isFastLearning = this.isFastLearningMode();
-      let combinedScore = (technicalScore * 0.6) + (newsScore * 0.4);
+      let combinedScore = (technicalScore * 0.7) + (newsScore * 0.3);
       
       // Apply fast learning enhancements
       if (isFastLearning) {
         combinedScore = this.enhanceScoreForFastLearning(combinedScore, marketData, sentimentScore);
       }
+      
+      // Apply market condition adjustments
+      combinedScore = this.adjustScoreForMarketCondition(combinedScore, marketCondition);
 
       let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
       let confidence = 0.5;
@@ -196,18 +210,89 @@ Respond with: ACTION CONFIDENCE REASONING`;
       if (combinedScore > buyThreshold) {
         action = 'BUY';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
+        reasoning = `Bullish signals in ${marketCondition.type} market: RSI ${marketData.rsi?.toFixed(2)}, EMA ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       } else if (combinedScore < sellThreshold) {
         action = 'SELL';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
+        reasoning = `Bearish signals in ${marketCondition.type} market: RSI ${marketData.rsi?.toFixed(2)}, EMA ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       }
+
+      // Final confidence adjustment for market condition
+      confidence = this.adjustConfidenceForMarketCondition(confidence, marketCondition);
 
       return { action, confidence, reasoning, sentimentScore };
     } catch (error) {
       console.error('Trading signal generation failed:', error);
       return { action: 'HOLD', confidence: 0.5, reasoning: 'Analysis failed', sentimentScore: 0 };
     }
+  }
+
+  private analyzeMarketCondition(marketData: any): any {
+    // Simple market condition analysis (can be enhanced)
+    const { rsi, macd, volumeRatio, emaTrend, bollinger } = marketData;
+    
+    // Calculate volatility
+    const volatility = bollinger ? (bollinger.upper - bollinger.lower) / bollinger.middle : 0.02;
+    
+    let type = 'UNCERTAIN';
+    let confidence = 0.5;
+    
+    if (volatility > 0.05) {
+      type = 'HIGH_VOLATILITY';
+      confidence = 0.8;
+    } else if (emaTrend === 'BULLISH' && rsi > 50 && macd > 0) {
+      type = 'TRENDING_UP';
+      confidence = 0.7;
+    } else if (emaTrend === 'BEARISH' && rsi < 50 && macd < 0) {
+      type = 'TRENDING_DOWN';
+      confidence = 0.7;
+    } else if (Math.abs(macd) < 0.001 && rsi > 40 && rsi < 60) {
+      type = 'SIDEWAYS';
+      confidence = 0.6;
+    }
+    
+    return { type, confidence, volatility, volume: volumeRatio };
+  }
+
+  private adjustScoreForMarketCondition(score: number, marketCondition: any): number {
+    switch (marketCondition.type) {
+      case 'HIGH_VOLATILITY':
+        return score * 0.8; // Reduce signal strength in volatile markets
+      case 'UNCERTAIN':
+        return score * 0.7; // Reduce signal strength in uncertain markets
+      case 'TRENDING_UP':
+      case 'TRENDING_DOWN':
+        return score * 1.1; // Boost signal strength in trending markets
+      case 'SIDEWAYS':
+        return score * 0.9; // Slightly reduce in sideways markets
+      default:
+        return score;
+    }
+  }
+
+  private adjustConfidenceForMarketCondition(confidence: number, marketCondition: any): number {
+    let adjustment = 1.0;
+    
+    switch (marketCondition.type) {
+      case 'HIGH_VOLATILITY':
+        adjustment = 0.8; // Lower confidence in volatile markets
+        break;
+      case 'UNCERTAIN':
+        adjustment = 0.7; // Lower confidence in uncertain markets
+        break;
+      case 'TRENDING_UP':
+      case 'TRENDING_DOWN':
+        adjustment = 1.1; // Higher confidence in trending markets
+        break;
+      case 'SIDEWAYS':
+        adjustment = 0.9; // Slightly lower confidence in sideways markets
+        break;
+    }
+    
+    // Also adjust based on market condition confidence
+    adjustment *= marketCondition.confidence;
+    
+    return Math.max(0.1, Math.min(0.95, confidence * adjustment));
   }
 
   private isFastLearningMode(): boolean {

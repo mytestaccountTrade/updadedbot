@@ -476,69 +476,240 @@ class TradingBot {
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
     
-    if (!this.config.fastLearningMode) {
-      console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
-    }
+    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
     
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
       if (!marketData) {
-        if (!this.config.fastLearningMode) {
-          console.log(`⚠️ No market data for position ${position.symbol}`);
-        }
+        console.log(`⚠️ No market data for position ${position.symbol}`);
         continue;
       }
+      
+      // Get current market condition for exit decisions
+      const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
+      const strategy = adaptiveStrategy.selectOptimalStrategy(marketCondition);
       
       position.currentPrice = marketData.price;
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
-      // Check multi-exit levels
+      // Priority 1: Check multi-exit levels (highest priority)
       const exitResult = this.checkMultiExitLevels(position, marketData.price);
       if (exitResult.shouldExit) {
-        console.log(`${this.config.fastLearningMode ? '⚡' : '🔄'} Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
+        console.log(`🎯 Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
         await this.closePositionInternal(position, exitResult.reason);
         continue;
       }
       
-      // Much more aggressive exit conditions for fast learning
-      const stopLossThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? -1.5 : -this.config.stopLossPercent * 100; // 1.5% stop loss in fast mode
-      const takeProfitThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? 2 : this.config.takeProfitPercent * 100; // 2% take profit in fast mode
-      
-      let shouldExit = false;
-      let exitReason = '';
-      
-      // Check stop loss
-      if (position.pnlPercent <= stopLossThreshold) {
-        shouldExit = true;
-        exitReason = 'STOP_LOSS';
-      }
-      // Check take profit
-      else if (position.pnlPercent >= takeProfitThreshold) {
-        shouldExit = true;
-        exitReason = 'TAKE_PROFIT';
-      }
-      // Check learning-based exit (only in normal mode)
-      else {
-        const learningExit = await this.shouldExitBasedOnLearning(position, marketData);
-        if (learningExit) {
-          shouldExit = true;
-          exitReason = 'LEARNING_EXIT';
-        }
+      // Priority 2: Market regime-based exits
+      const regimeExit = this.checkMarketRegimeExit(position, marketData, marketCondition, strategy);
+      if (regimeExit.shouldExit) {
+        console.log(`📊 Market regime exit for ${position.symbol}: ${regimeExit.reason}`);
+        await this.closePositionInternal(position, regimeExit.reason);
+        continue;
       }
       
-      if (shouldExit) {
-        const logLevel = this.config.fastLearningMode ? '⚡' : '🔄';
-        console.log(`${logLevel} Closing position ${position.symbol} - Reason: ${exitReason}, P&L: ${position.pnlPercent.toFixed(2)}%`);
-        await this.closePositionInternal(position, exitReason);
+      // Priority 3: Time-based and learning exits
+      const timeBasedExit = this.checkTimeBasedExit(position, marketData);
+      if (timeBasedExit.shouldExit) {
+        console.log(`⏰ Time-based exit for ${position.symbol}: ${timeBasedExit.reason}`);
+        await this.closePositionInternal(position, timeBasedExit.reason);
+        continue;
+      }
+      
+      // Priority 4: Traditional stop-loss and take-profit (fallback)
+      const traditionalExit = this.checkTraditionalExit(position, marketData);
+      if (traditionalExit.shouldExit) {
+        console.log(`🛑 Traditional exit for ${position.symbol}: ${traditionalExit.reason}`);
+        await this.closePositionInternal(position, traditionalExit.reason);
+        continue;
       }
     }
   }
 
+  private checkMarketRegimeExit(position: Position, marketData: MarketData, marketCondition: any, strategy: any): { shouldExit: boolean; reason: string } {
+    const { type, volatility, confidence } = marketCondition;
+    const positionAge = Date.now() - position.timestamp;
+    const ageInMinutes = positionAge / (1000 * 60);
+    
+    // High volatility regime - tighter exits
+    if (type === 'HIGH_VOLATILITY') {
+      if (Math.abs(position.pnlPercent) > 3) {
+        return { shouldExit: true, reason: 'HIGH_VOLATILITY_PROTECTION' };
+      }
+    }
+    
+    // Uncertain market - exit on any reasonable profit
+    if (type === 'UNCERTAIN' && confidence < 0.4) {
+      if (position.pnlPercent > 0.5) {
+        return { shouldExit: true, reason: 'UNCERTAIN_MARKET_PROFIT_TAKE' };
+      }
+      if (position.pnlPercent < -1) {
+        return { shouldExit: true, reason: 'UNCERTAIN_MARKET_LOSS_CUT' };
+      }
+    }
+    
+    // Trending market - let winners run but cut losers quickly
+    if (type === 'TRENDING_UP' || type === 'TRENDING_DOWN') {
+      const isWithTrend = (type === 'TRENDING_UP' && position.side === 'LONG') || 
+                         (type === 'TRENDING_DOWN' && position.side === 'SHORT');
+      
+      if (!isWithTrend && position.pnlPercent < -1.5) {
+        return { shouldExit: true, reason: 'AGAINST_TREND_CUT' };
+      }
+    }
+    
+    // Sideways market - quick scalping exits
+    if (type === 'SIDEWAYS') {
+      if (position.pnlPercent > 1.5) {
+        return { shouldExit: true, reason: 'SIDEWAYS_SCALP_PROFIT' };
+      }
+      if (position.pnlPercent < -1) {
+        return { shouldExit: true, reason: 'SIDEWAYS_SCALP_LOSS' };
+      }
+    }
+    
+    return { shouldExit: false, reason: '' };
+  }
+
+  private checkTimeBasedExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
+    const positionAge = Date.now() - position.timestamp;
+    const ageInMinutes = positionAge / (1000 * 60);
+    const ageInHours = ageInMinutes / 60;
+    
+    // Fast learning mode - quicker exits
+    if (this.config.fastLearningMode) {
+      // Exit losing positions quickly in fast mode
+      if (ageInMinutes > 10 && position.pnlPercent < -0.5) {
+        return { shouldExit: true, reason: 'FAST_LEARNING_TIME_LOSS' };
+      }
+      
+      // Exit any position after 30 minutes in fast mode
+      if (ageInMinutes > 30) {
+        return { shouldExit: true, reason: 'FAST_LEARNING_MAX_TIME' };
+      }
+    }
+    
+    // Normal mode time-based exits
+    else {
+      // Exit losing positions after 2 hours
+      if (ageInHours > 2 && position.pnlPercent < 0) {
+        return { shouldExit: true, reason: 'TIME_BASED_LOSS_CUT' };
+      }
+      
+      // Exit any position after 24 hours
+      if (ageInHours > 24) {
+        return { shouldExit: true, reason: 'MAX_HOLD_TIME' };
+      }
+      
+      // Exit stagnant positions (no movement for 4 hours)
+      if (ageInHours > 4 && Math.abs(position.pnlPercent) < 0.1) {
+        return { shouldExit: true, reason: 'STAGNANT_POSITION' };
+      }
+    }
+    
+    return { shouldExit: false, reason: '' };
+  }
+
+  private checkTraditionalExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
+    // Dynamic thresholds based on mode and market conditions
+    const stopLossThreshold = this.config.fastLearningMode ? -1.5 : -this.config.stopLossPercent * 100;
+    const takeProfitThreshold = this.config.fastLearningMode ? 2.5 : this.config.takeProfitPercent * 100;
+      
+    // Adaptive thresholds based on volatility
+    const volatility = marketData.bollinger ? 
+      (marketData.bollinger.upper - marketData.bollinger.lower) / marketData.bollinger.middle : 0.02;
+    
+    const volatilityMultiplier = Math.max(0.5, Math.min(2, volatility * 50));
+    const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
+    const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
+      
+      // Check stop loss
+    if (position.pnlPercent <= adaptiveStopLoss) {
+      return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
+      }
+      // Check take profit
+    if (position.pnlPercent >= adaptiveTakeProfit) {
+      return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
+      }
+    
+    return { shouldExit: false, reason: '' };
+  }
+
+  private checkMultiExitLevels(position: Position, currentPrice: number): { shouldExit: boolean; reason: string } {
+    const exitData = this.multiExitPositions.get(position.id);
+    if (!exitData) {
+      // Initialize if not exists
+      const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
+      this.multiExitPositions.set(position.id, {
+        tp1Hit: false,
+        tp2Hit: false,
+        trailingSL: exitLevels.sl
+      });
+      return { shouldExit: false, reason: '' };
+    }
+    
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
+    const isLong = position.side === 'LONG';
+    
+    // Check stop loss first (highest priority)
+    if ((isLong && currentPrice <= exitData.trailingSL) || (!isLong && currentPrice >= exitData.trailingSL)) {
+      return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
+    }
+    
+    // Check take profit levels
+    if (!exitData.tp1Hit) {
+      if ((isLong && currentPrice >= exitLevels.tp1) || (!isLong && currentPrice <= exitLevels.tp1)) {
+        exitData.tp1Hit = true;
+        // Move trailing stop to breakeven
+        exitData.trailingSL = position.entryPrice;
+        console.log(`🎯 TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`);
+        
+        // Close 33% of position at TP1 (for now, close entire position)
+        return { shouldExit: true, reason: 'TP1_REACHED' };
+      }
+    } else if (!exitData.tp2Hit) {
+      if ((isLong && currentPrice >= exitLevels.tp2) || (!isLong && currentPrice <= exitLevels.tp2)) {
+        exitData.tp2Hit = true;
+        // Move trailing stop to TP1
+        exitData.trailingSL = exitLevels.tp1;
+        console.log(`🎯 TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`);
+        
+        // Close another 33% at TP2 (for now, close entire position)
+        return { shouldExit: true, reason: 'TP2_REACHED' };
+      }
+    } else {
+      // Both TP1 and TP2 hit, check TP3 for final exit
+      if ((isLong && currentPrice >= exitLevels.tp3) || (!isLong && currentPrice <= exitLevels.tp3)) {
+        return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
+      
+      // Update trailing stop if price moves favorably
+      const trailDistance = isLong ? 0.015 : -0.015; // 1.5% trail
+      const newTrailingSL = isLong 
+        ? Math.max(exitData.trailingSL, currentPrice * (1 - 0.015))
+        : Math.min(exitData.trailingSL, currentPrice * (1 + 0.015));
+      
+      if (newTrailingSL !== exitData.trailingSL) {
+        exitData.trailingSL = newTrailingSL;
+        console.log(`📈 Trailing stop updated for ${position.symbol}: ${newTrailingSL.toFixed(2)}`);
+      }
+    }
+    
+    return { shouldExit: false, reason: '' };
+  }
+
   private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
     try {
+      // Enhanced learning-based exit with market regime context
+      const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
       const exitSignal = await learningService.shouldExit(position, marketData);
-      return exitSignal.shouldExit && exitSignal.confidence > 0.7;
+      
+      // Adjust confidence threshold based on market condition
+      let confidenceThreshold = 0.7;
+      if (marketCondition.type === 'HIGH_VOLATILITY') confidenceThreshold = 0.6;
+      if (marketCondition.type === 'UNCERTAIN') confidenceThreshold = 0.5;
+      
+      return exitSignal.shouldExit && exitSignal.confidence > confidenceThreshold;
     } catch (error) {
       console.error('Learning-based exit analysis failed:', error);
       return false;
@@ -552,13 +723,22 @@ class TradingBot {
       return;
     }
     
+    // Enhanced entry validation with market regime context
+    const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
+    const entryValidation = this.validateTradeEntry(symbol, action, marketData, marketCondition, signal);
+    if (!entryValidation.valid) {
+      console.log(`🚫 Entry blocked for ${symbol}: ${entryValidation.reason}`);
+      return;
+    }
+    
     // Apply adaptive risk sizing
     const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
     const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
     const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
     const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
+    const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
     
-    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier;
+    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
     const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
     const quantity = riskAmount / marketData.price;
     
@@ -591,6 +771,7 @@ class TradingBot {
     const tradeContext = {
       marketData,
       signal,
+      marketCondition,
       newsContext: newsService.getLatestNews().filter(item => 
         item.coins.includes(symbol.replace('USDT', ''))
       ),
@@ -625,8 +806,8 @@ class TradingBot {
     this.portfolio.positions.push(position);
     this.activePositionIds.add(symbol);
     
-    // Set up multi-exit levels
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side);
+    // Set up multi-exit levels with market regime adjustments
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side, marketCondition);
     this.multiExitPositions.set(position.id, {
       tp1Hit: false,
       tp2Hit: false,
@@ -637,7 +818,78 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
-    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)} (Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%)`);
+    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
+    console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
+    console.log(`   🎯 Exits: TP1=${exitLevels.tp1.toFixed(2)}, TP2=${exitLevels.tp2.toFixed(2)}, TP3=${exitLevels.tp3.toFixed(2)}, SL=${exitLevels.sl.toFixed(2)}`);
+  }
+
+  private validateTradeEntry(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, marketCondition: any, signal?: any): { valid: boolean; reason: string } {
+    const { rsi, macd, volumeRatio, emaTrend } = marketData;
+    
+    // Check for conflicting signals
+    let conflictCount = 0;
+    let totalSignals = 0;
+    
+    // RSI vs Action conflict
+    if (rsi > 70 && action === 'BUY') conflictCount++;
+    if (rsi < 30 && action === 'SELL') conflictCount++;
+    totalSignals++;
+    
+    // MACD vs Action conflict
+    if (macd < 0 && action === 'BUY') conflictCount++;
+    if (macd > 0 && action === 'SELL') conflictCount++;
+    totalSignals++;
+    
+    // EMA Trend vs Action conflict
+    if (emaTrend === 'BEARISH' && action === 'BUY') conflictCount++;
+    if (emaTrend === 'BULLISH' && action === 'SELL') conflictCount++;
+    totalSignals++;
+    
+    // Too many conflicts
+    if (conflictCount >= 2) {
+      return { valid: false, reason: 'CONFLICTING_INDICATORS' };
+    }
+    
+    // Low volume validation
+    if (volumeRatio < 0.5) {
+      return { valid: false, reason: 'LOW_VOLUME' };
+    }
+    
+    // Market condition validation
+    if (marketCondition.type === 'UNCERTAIN' && marketCondition.confidence < 0.3) {
+      return { valid: false, reason: 'UNCERTAIN_MARKET' };
+    }
+    
+    // Time-based validation
+    const hour = new Date().getUTCHours();
+    const isLowLiquidityTime = hour >= 22 || hour < 6; // Overnight
+    
+    if (isLowLiquidityTime && marketCondition.type === 'HIGH_VOLATILITY') {
+      return { valid: false, reason: 'HIGH_VOLATILITY_OVERNIGHT' };
+    }
+    
+    // Signal confidence validation
+    if (signal && signal.confidence < 0.4) {
+      return { valid: false, reason: 'LOW_SIGNAL_CONFIDENCE' };
+    }
+    
+    return { valid: true, reason: 'ENTRY_VALIDATED' };
+  }
+
+  private getMarketRiskMultiplier(marketCondition: any): number {
+    switch (marketCondition.type) {
+      case 'HIGH_VOLATILITY':
+        return 0.6; // Reduce risk in high volatility
+      case 'UNCERTAIN':
+        return 0.7; // Reduce risk in uncertain conditions
+      case 'TRENDING_UP':
+      case 'TRENDING_DOWN':
+        return 1.1; // Slightly increase risk in trending markets
+      case 'SIDEWAYS':
+        return 0.9; // Slightly reduce risk in sideways markets
+      default:
+        return 1.0;
+    }
   }
 
   private async closePositionInternal(position: Position, reason: string) {
@@ -725,56 +977,6 @@ class TradingBot {
     }
   }
   
-  private checkMultiExitLevels(position: Position, currentPrice: number): { shouldExit: boolean; reason: string } {
-    const exitData = this.multiExitPositions.get(position.id);
-    if (!exitData) return { shouldExit: false, reason: '' };
-    
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
-    const isLong = position.side === 'LONG';
-    
-    // Check stop loss
-    if ((isLong && currentPrice <= exitData.trailingSL) || (!isLong && currentPrice >= exitData.trailingSL)) {
-      return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
-    }
-    
-    // Check take profit levels
-    if (!exitData.tp1Hit) {
-      if ((isLong && currentPrice >= exitLevels.tp1) || (!isLong && currentPrice <= exitLevels.tp1)) {
-        exitData.tp1Hit = true;
-        // Close 33% of position at TP1
-        console.log(`🎯 TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} (target: ${exitLevels.tp1.toFixed(2)})`);
-        // Update trailing stop to breakeven
-        exitData.trailingSL = position.entryPrice;
-        return { shouldExit: false, reason: 'TP1_PARTIAL' };
-      }
-    } else if (!exitData.tp2Hit) {
-      if ((isLong && currentPrice >= exitLevels.tp2) || (!isLong && currentPrice <= exitLevels.tp2)) {
-        exitData.tp2Hit = true;
-        // Close another 33% at TP2
-        console.log(`🎯 TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} (target: ${exitLevels.tp2.toFixed(2)})`);
-        // Update trailing stop to TP1
-        exitData.trailingSL = exitLevels.tp1;
-        return { shouldExit: false, reason: 'TP2_PARTIAL' };
-      }
-    } else {
-      // Both TP1 and TP2 hit, check TP3 for final exit
-      if ((isLong && currentPrice >= exitLevels.tp3) || (!isLong && currentPrice <= exitLevels.tp3)) {
-        return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
-      }
-      
-      // Update trailing stop if price moves favorably
-      const newTrailingSL = isLong 
-        ? Math.max(exitData.trailingSL, currentPrice * 0.985) // Trail 1.5% below current price
-        : Math.min(exitData.trailingSL, currentPrice * 1.015); // Trail 1.5% above current price
-      
-      if (newTrailingSL !== exitData.trailingSL) {
-        exitData.trailingSL = newTrailingSL;
-        console.log(`📈 Trailing stop updated for ${position.symbol}: ${newTrailingSL.toFixed(2)}`);
-      }
-    }
-    
-    return { shouldExit: false, reason: '' };
-  }
 
   // Manual trading methods
   async buyAsset(symbol: string, amount: number) {
