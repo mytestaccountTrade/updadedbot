@@ -65,7 +65,7 @@ class BinanceService {
 
   private async initializeSymbols() {
     try {
-      const exchangeInfo = await this.makeRequest('/api/v3/exchangeInfo');
+      const exchangeInfo = await this.makeRequestWithRetry('/api/v3/exchangeInfo');
       
       exchangeInfo.symbols
         .filter((symbol: any) => symbol.status === 'TRADING' && symbol.symbol.endsWith('USDT'))

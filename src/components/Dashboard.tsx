@@ -84,6 +84,11 @@ export const Dashboard: React.FC = () => {
     setIsRunning(!isRunning);
   };
 
+  const handleResetAILearning = () => {
+    tradingBot.resetAILearning();
+    updateLearningStats();
+  };
+
   const config = tradingBot.getConfig();
 
   return (
