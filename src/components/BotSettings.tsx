@@ -12,6 +12,7 @@ interface BotSettingsProps {
 export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClose }) => {
   const { t, language, setLanguage } = useLanguage();
   const [formData, setFormData] = useState<BotConfig>(config);
+  const [showResetToast, setShowResetToast] = useState(false);
 
   const handleSave = () => {
     // Handle adaptive strategy toggle
@@ -29,8 +30,26 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
     }));
   };
 
+  const handleResetAILearning = async () => {
+    try {
+      const success = (window as any).tradingBot?.resetAILearning();
+      if (success) {
+        setShowResetToast(true);
+        setTimeout(() => setShowResetToast(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to reset AI learning:', error);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <>
+      {showResetToast && (
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+          ✅ AI learning has been reset.
+        </div>
+      )}
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -379,7 +398,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
           </div>
         </div>
       </div>
-      </div>
+    </div>
     </>
   );
 };
