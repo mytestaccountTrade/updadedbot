@@ -282,6 +282,51 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">{t('tradingFeatures')}</h3>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Trading Mode</label>
+              <div className="grid grid-cols-3 gap-4">
+                <button
+                  onClick={() => handleChange('tradeMode', 'scalper')}
+                  className={`p-3 rounded-lg border-2 transition-colors ${
+                    formData.tradeMode === 'scalper'
+                      ? 'border-red-500 bg-red-50 text-red-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">Scalper</div>
+                    <div className="text-xs text-gray-600">Fast trades, high frequency</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleChange('tradeMode', 'swing')}
+                  className={`p-3 rounded-lg border-2 transition-colors ${
+                    formData.tradeMode === 'swing'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">Swing</div>
+                    <div className="text-xs text-gray-600">Medium-term positions</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleChange('tradeMode', 'auto')}
+                  className={`p-3 rounded-lg border-2 transition-colors ${
+                    formData.tradeMode === 'auto'
+                      ? 'border-green-500 bg-green-50 text-green-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">Auto</div>
+                    <div className="text-xs text-gray-600">Adaptive based on market</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+            
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-900">{t('newsBasedTrading')}</div>

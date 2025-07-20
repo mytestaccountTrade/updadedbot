@@ -1,4 +1,5 @@
 import { BotConfig, Portfolio, Position, Trade, MarketData } from '../types/trading';
+import { OpenPosition, TradeCooldown } from '../types/trading';
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
@@ -9,6 +10,8 @@ class TradingBot {
   private isRunning: boolean = false;
   private intervalId: NodeJS.Timeout | null = null;
   private activePositionIds: Set<string> = new Set();
+  private realOpenPositions: OpenPosition[] = [];
+  private tradeCooldowns: Map<string, TradeCooldown> = new Map();
 
   constructor() {
     this.config = {
@@ -20,6 +23,7 @@ class TradingBot {
       maxPositions: 8, // More positions for more opportunities
       enableNewsTrading: true,
       enableTechnicalAnalysis: true,
+      tradeMode: 'auto',
     };
 
     this.portfolio = {
@@ -85,6 +89,10 @@ class TradingBot {
         this.portfolio.availableBalance = accountInfo.totalWalletBalance;
         console.log(`Real wallet balance updated: $${accountInfo.totalWalletBalance.toFixed(2)}`);
       }
+      
+      // Also fetch real open positions
+      this.realOpenPositions = await binanceService.getOpenPositions();
+      console.log(`📊 Real open positions: ${this.realOpenPositions.length}`);
     }
   }
 
@@ -145,18 +153,29 @@ class TradingBot {
         // Skip if we already have a position in this symbol
         if (this.activePositionIds.has(pair.symbol)) continue;
         
+        // Check cooldown and backoff mechanisms
+        if (this.isSymbolOnCooldown(pair.symbol)) {
+          console.log(`⏰ Symbol ${pair.symbol} is on cooldown, skipping`);
+          continue;
+        }
+        
         const marketData = await binanceService.getMarketData(pair.symbol);
         if (!marketData) continue;
         
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         
-        // Apply learning insights to improve decision making
-        const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+        // Check for position conflicts and apply dynamic trade style
+        const enhancedSignal = this.enhanceSignalWithPositionAwareness(signal, pair.symbol, marketData);
         
-        // More aggressive entry - lower confidence threshold
-        if (enhancedSignal.action !== 'HOLD' && enhancedSignal.confidence > 0.6) {
-          console.log(`🎯 Trading signal: ${enhancedSignal.action} ${pair.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
-          await this.executeTrade(pair.symbol, enhancedSignal.action, marketData, enhancedSignal);
+        // Apply learning insights to improve decision making
+        const finalSignal = await learningService.enhanceSignal(enhancedSignal, marketData, learningInsights);
+        
+        // Dynamic confidence threshold based on trade style
+        const confidenceThreshold = this.getConfidenceThreshold(finalSignal.tradeStyle);
+        
+        if (finalSignal.action !== 'HOLD' && finalSignal.confidence > confidenceThreshold) {
+          console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)}, style: ${finalSignal.tradeStyle})`);
+          await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal);
         }
       }
       
@@ -284,6 +303,9 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
+    // Update cooldown tracking
+    this.updateTradeCooldown(symbol, false); // Will be updated to true/false when position closes
+    
     console.log(`${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at ${marketData.price}`);
   }
 
@@ -324,6 +346,9 @@ class TradingBot {
     // Record position close for learning
     await learningService.recordPositionClose(position, trade, reason);
     
+    // Update cooldown with profit/loss result
+    this.updateTradeCooldown(position.symbol, position.pnl > 0);
+    
     // Remove position
     this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
     this.activePositionIds.delete(position.symbol);
@@ -339,6 +364,142 @@ class TradingBot {
     this.portfolio.totalValue = this.portfolio.availableBalance + positionsValue;
     this.portfolio.totalPnl = totalPnl;
     this.portfolio.totalPnlPercent = (totalPnl / this.config.simulationBalance) * 100;
+  }
+
+  private enhanceSignalWithPositionAwareness(signal: any, symbol: string, marketData: MarketData): any {
+    const existingPosition = this.findExistingPosition(symbol);
+    let openPositionConflict = false;
+    let adjustedConfidence = signal.confidence;
+    let adjustedAction = signal.action;
+    let reasoning = signal.reasoning;
+
+    // Check for position conflicts
+    if (existingPosition) {
+      if ((existingPosition.side === 'LONG' && signal.action === 'BUY') ||
+          (existingPosition.side === 'SHORT' && signal.action === 'SELL')) {
+        openPositionConflict = true;
+        adjustedAction = 'HOLD';
+        adjustedConfidence *= 0.3; // Reduce confidence significantly
+        reasoning += ` [CONFLICT: Already have ${existingPosition.side} position]`;
+        console.log(`⚠️ Position conflict detected for ${symbol}: ${existingPosition.side} vs ${signal.action}`);
+      }
+    }
+
+    // Apply dynamic trade style adjustments
+    const tradeStyle = this.determineTradeStyle(signal.volatilityScore, signal.sentimentScore, signal.trendConsistency);
+    
+    switch (tradeStyle) {
+      case 'scalper':
+        // More aggressive for scalping
+        if (signal.volatilityScore > 0.7) {
+          adjustedConfidence *= 1.2;
+          reasoning += ' [SCALPER: High volatility boost]';
+        }
+        break;
+      case 'swing':
+        // Moderate approach for swing trading
+        if (signal.trendConsistency > 0.6) {
+          adjustedConfidence *= 1.1;
+          reasoning += ' [SWING: Trend consistency boost]';
+        }
+        break;
+      case 'conservative':
+        // Conservative approach
+        adjustedConfidence *= 0.8;
+        if (Math.abs(signal.sentimentScore) < 0.3) {
+          adjustedAction = 'HOLD';
+          reasoning += ' [CONSERVATIVE: Weak sentiment, holding]';
+        }
+        break;
+    }
+
+    return {
+      ...signal,
+      action: adjustedAction,
+      confidence: Math.max(0.1, Math.min(1.0, adjustedConfidence)),
+      reasoning,
+      openPositionConflict,
+      tradeStyle
+    };
+  }
+
+  private findExistingPosition(symbol: string): OpenPosition | Position | null {
+    // Check real positions first (for REAL mode)
+    if (this.config.mode === 'REAL') {
+      const realPosition = this.realOpenPositions.find(pos => pos.symbol === symbol);
+      if (realPosition) return realPosition;
+    }
+    
+    // Check simulation positions
+    const simPosition = this.portfolio.positions.find(pos => pos.symbol === symbol);
+    return simPosition || null;
+  }
+
+  private determineTradeStyle(volatility: number, sentiment: number, consistency: number): 'scalper' | 'swing' | 'conservative' {
+    if (this.config.tradeMode !== 'auto') {
+      return this.config.tradeMode as 'scalper' | 'swing';
+    }
+
+    const avgScore = (volatility + Math.abs(sentiment) + consistency) / 3;
+    
+    if (volatility > 0.7 && Math.abs(sentiment) > 0.6) {
+      return 'scalper';
+    } else if (consistency > 0.6 && avgScore > 0.5) {
+      return 'swing';
+    } else {
+      return 'conservative';
+    }
+  }
+
+  private getConfidenceThreshold(tradeStyle: string): number {
+    switch (tradeStyle) {
+      case 'scalper': return 0.55; // Lower threshold for fast trades
+      case 'swing': return 0.65; // Moderate threshold
+      case 'conservative': return 0.75; // Higher threshold for safety
+      default: return 0.6;
+    }
+  }
+
+  private isSymbolOnCooldown(symbol: string): boolean {
+    const cooldown = this.tradeCooldowns.get(symbol);
+    if (!cooldown) return false;
+
+    const now = Date.now();
+    
+    // Check if symbol is paused due to consecutive losses
+    if (cooldown.pausedUntil && now < cooldown.pausedUntil) {
+      return true;
+    }
+    
+    // Check 5-minute cooldown after last trade
+    const timeSinceLastTrade = now - cooldown.lastTradeTime;
+    return timeSinceLastTrade < 5 * 60 * 1000; // 5 minutes
+  }
+
+  private updateTradeCooldown(symbol: string, wasProfit: boolean) {
+    const now = Date.now();
+    const existing = this.tradeCooldowns.get(symbol) || {
+      symbol,
+      lastTradeTime: 0,
+      consecutiveLosses: 0
+    };
+
+    existing.lastTradeTime = now;
+
+    if (wasProfit) {
+      existing.consecutiveLosses = 0;
+      existing.pausedUntil = undefined;
+    } else {
+      existing.consecutiveLosses++;
+      
+      // Pause for 1 hour after 3 consecutive losses
+      if (existing.consecutiveLosses >= 3) {
+        existing.pausedUntil = now + 60 * 60 * 1000; // 1 hour
+        console.log(`🚫 Symbol ${symbol} paused for 1 hour due to 3 consecutive losses`);
+      }
+    }
+
+    this.tradeCooldowns.set(symbol, existing);
   }
 
   // Manual trading methods
