@@ -977,6 +977,7 @@ class TradingBot {
       console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${positionsValue.toFixed(2)}, Invested: $${investedCapital.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
     }
   }
+  
 
   // Manual trading methods
   async buyAsset(symbol: string, amount: number) {
