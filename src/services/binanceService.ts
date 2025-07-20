@@ -46,6 +46,8 @@ class BinanceService {
   private activeRequests: number = 0;
   private requestQueue: Array<() => Promise<any>> = [];
 
+  private cachedTradingPairs: TradingPair[] = [];
+
   constructor() {
     this.apiKey = '';
     this.apiSecret = '';
@@ -200,14 +202,6 @@ class BinanceService {
   subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
     if (this.wsConnections.has(symbol)) {
       console.log(`Already subscribed to ${symbol}`);
-  private cachedTradingPairs: TradingPair[] = [];
-
-  private getCachedTradingPairs(): TradingPair[] {
-    if (this.cachedTradingPairs.length > 0) {
-      return this.cachedTradingPairs;
-    }
-    return this.getMockTradingPairs();
-  }
       return;
     }
 
@@ -574,6 +568,23 @@ class BinanceService {
       console.log(`📡 Disconnected from ${symbol}`);
     });
     this.wsConnections.clear();
+  }
+
+  private getCachedTradingPairs(): TradingPair[] {
+    if (this.cachedTradingPairs.length > 0) {
+      return this.cachedTradingPairs;
+    }
+    return this.getMockTradingPairs();
+  }
+
+  private getMockTradingPairs(): TradingPair[] {
+    return [
+      { symbol: 'BTCUSDT', price: 43000, change24h: 2.5, volume: 1000000, high24h: 44000, low24h: 42000 },
+      { symbol: 'ETHUSDT', price: 2600, change24h: 1.8, volume: 800000, high24h: 2650, low24h: 2550 },
+      { symbol: 'BNBUSDT', price: 320, change24h: -0.5, volume: 500000, high24h: 325, low24h: 315 },
+      { symbol: 'ADAUSDT', price: 0.45, change24h: 3.2, volume: 300000, high24h: 0.47, low24h: 0.43 },
+      { symbol: 'SOLUSDT', price: 95, change24h: 4.1, volume: 400000, high24h: 98, low24h: 92 }
+    ];
   }
 
   private calculateRSI(prices: number[]): number {
