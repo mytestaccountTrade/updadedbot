@@ -1017,6 +1017,31 @@ class TradingBot {
     
     return await this.closePositionInternal(position, 'MANUAL_CLOSE');
   }
+
+  resetAILearning() {
+    console.log('🔄 Resetting AI learning across all services...');
+    
+    // Reset adaptive strategy learning
+    adaptiveStrategy.resetLearning();
+    
+    // Reset learning service
+    learningService.resetLearning();
+    
+    // Reset news service learning
+    newsService.resetLearning();
+    
+    // Clear multi-exit positions (fresh start for position management)
+    this.multiExitPositions.clear();
+    
+    // Reset fast learning counters
+    this.fastLearningTradeCount = 0;
+    this.lastFastLearningTrade = 0;
+    this.fastLearningRetrainCounter = 0;
+    
+    console.log('✅ Complete AI learning reset finished');
+    
+    return true;
+  }
 }
 
 export const tradingBot = new TradingBot();

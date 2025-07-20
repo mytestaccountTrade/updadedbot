@@ -613,6 +613,36 @@ class AdaptiveStrategyService {
       console.error('Failed to load adaptive strategy data:', error);
     }
   }
+
+  resetLearning() {
+    console.log('🔄 Resetting adaptive strategy learning...');
+    
+    // Reset learned patterns
+    this.learnedPatterns = [];
+    
+    // Reset risk metrics to defaults (but keep total trade count)
+    const totalTrades = this.riskMetrics.totalTrades;
+    const profitableTrades = this.riskMetrics.profitableTrades;
+    this.riskMetrics = {
+      recentWinRate: 0.5,
+      consecutiveLosses: 0,
+      currentRiskLevel: 1.0,
+      lastCooldownEnd: 0,
+      totalTrades,
+      profitableTrades
+    };
+    
+    // Clear recent trades for fresh learning
+    this.recentTrades = [];
+    
+    // Clear trade reflections
+    this.tradeReflections = [];
+    
+    // Save reset state
+    this.saveStoredData();
+    
+    console.log('✅ Adaptive strategy learning reset complete');
+  }
 }
 
 export const adaptiveStrategy = new AdaptiveStrategyService();

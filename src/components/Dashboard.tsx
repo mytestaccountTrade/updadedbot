@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Settings, TrendingUp, TrendingDown, DollarSign, Activity, Globe } from 'lucide-react';
+import { Play, Pause, Settings, TrendingUp, TrendingDown, DollarSign, Activity, Globe, RotateCcw } from 'lucide-react';
 import { tradingBot } from '../services/tradingBot';
 import { binanceService } from '../services/binanceService';
 import { newsService } from '../services/newsService';
@@ -25,6 +25,7 @@ export const Dashboard: React.FC = () => {
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const [showResetToast, setShowResetToast] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -84,6 +85,22 @@ export const Dashboard: React.FC = () => {
     setIsRunning(!isRunning);
   };
 
+  const handleResetAILearning = async () => {
+    try {
+      const success = tradingBot.resetAILearning();
+      if (success) {
+        // Update stats immediately after reset
+        updateLearningStats();
+        
+        // Show success toast
+        setShowResetToast(true);
+        setTimeout(() => setShowResetToast(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to reset AI learning:', error);
+    }
+  };
+
   const config = tradingBot.getConfig();
 
   return (
@@ -141,6 +158,14 @@ export const Dashboard: React.FC = () => {
                   </div>
                 )}
               </div>
+              <button
+                onClick={handleResetAILearning}
+                className="flex items-center space-x-2 px-3 py-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                title="Reset AI Learning"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span className="text-sm font-medium">🔄 Reset AI Learning</span>
+              </button>
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -350,6 +375,14 @@ export const Dashboard: React.FC = () => {
           }}
           onClose={() => setShowSettings(false)}
         />
+      )}
+
+      {/* Success Toast */}
+      {showResetToast && (
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2">
+          <RotateCcw className="w-5 h-5" />
+          <span>AI learning reset successfully</span>
+        </div>
       )}
     </div>
   );

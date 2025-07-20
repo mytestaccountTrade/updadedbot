@@ -1025,6 +1025,35 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       lastLearningUpdate: new Date(this.lastLearningUpdate).toLocaleString()
     };
   }
+
+  resetLearning() {
+    console.log('🔄 Resetting learning service...');
+    
+    // Reset learning insights but keep default structure
+    this.learningInsights = this.getDefaultInsights();
+    this.lastLearningUpdate = 0;
+    this.lastRetrainCount = 0;
+    
+    // Reset throttling and operation counters
+    this.lastLearningOperation = 0;
+    this.lastLlama3Request = 0;
+    this.activeLearningOps = 0;
+    
+    // Clear request queue
+    this.llama3RequestQueue = [];
+    
+    // Reset Llama 3 availability status
+    this.llama3Available = true;
+    this.llama3LastCheck = 0;
+    
+    // Save reset state
+    this.saveLearningInsights();
+    
+    // Clear training dataset
+    localStorage.removeItem('trading-bot-training-data');
+    
+    console.log('✅ Learning service reset complete');
+  }
 }
 
 export const learningService = new LearningService();

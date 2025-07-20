@@ -569,6 +569,19 @@ Respond with: ACTION CONFIDENCE REASONING`;
     return this.cachedNews;
   }
 
+  resetLearning() {
+    console.log('🔄 Resetting news service learning...');
+    
+    // Reset Llama 3 throttling and health monitoring
+    this.llama3LastCheck = 0;
+    this.llama3Available = true;
+    this.lastLlama3Request = 0;
+    this.llama3RequestQueue = [];
+    this.activeLlama3Requests = 0;
+    
+    console.log('✅ News service learning reset complete');
+  }
+
   private extractCoinsFromText(text: string): string[] {
     const coins = ['BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'LINK', 'MATIC', 'AVAX', 'UNI', 'LTC'];
     const foundCoins: string[] = [];
