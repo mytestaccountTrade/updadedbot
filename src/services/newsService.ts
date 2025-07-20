@@ -126,20 +126,22 @@ class NewsService {
     action: 'BUY' | 'SELL' | 'HOLD';
     confidence: number;
     reasoning: string;
+    sentimentScore: number;
   }> {
     try {
       const relevantNews = news.filter(item => item.coins.includes(symbol.replace('USDT', '')));
+      const sentimentScore = this.calculateSentimentScore(relevantNews);
       
       // Try to use local Llama 3 for trading signal generation
       try {
-        const newsContext = relevantNews.map(item => `${item.title}: ${item.sentiment}`).join('. ');
-        const prompt = `Based on this market data and news for ${symbol}:
-Price: ${marketData.price}
-RSI: ${marketData.rsi}
-MACD: ${marketData.macd}
-News: ${newsContext}
+        const prompt = `Given RSI: ${marketData.rsi?.toFixed(2)}, EMA Trend: ${marketData.emaTrend}, and News Sentiment: ${sentimentScore.toFixed(2)}, should we BUY, SELL or HOLD? Explain why.
 
-Generate a trading signal. Respond with only: BUY, SELL, or HOLD followed by confidence (0.0-1.0) and brief reasoning.`;
+Additional context:
+- Price: ${marketData.price}
+- Volume Ratio: ${marketData.volumeRatio?.toFixed(2)}
+- MACD: ${marketData.macd?.toFixed(4)}
+
+Respond with: ACTION CONFIDENCE REASONING`;
 
         const response = await fetch(`${this.llama3Url}/api/generate`, {
           method: 'POST',
@@ -165,7 +167,7 @@ Generate a trading signal. Respond with only: BUY, SELL, or HOLD followed by con
             const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.6;
             const reasoning = result.replace(/(BUY|SELL|HOLD)/, '').replace(/\d+\.?\d*/, '').trim();
             
-            return { action, confidence, reasoning: reasoning || 'AI analysis' };
+            return { action, confidence, reasoning: reasoning || 'AI analysis', sentimentScore };
           }
         }
       } catch (llama3Error) {
@@ -173,12 +175,8 @@ Generate a trading signal. Respond with only: BUY, SELL, or HOLD followed by con
       }
 
       // Fallback analysis
-      const avgSentiment = relevantNews.length > 0 
-        ? relevantNews.reduce((acc, item) => acc + (item.sentiment === 'BULLISH' ? 1 : item.sentiment === 'BEARISH' ? -1 : 0), 0) / relevantNews.length
-        : 0;
-
       const technicalScore = this.calculateTechnicalScore(marketData);
-      const newsScore = avgSentiment;
+      const newsScore = sentimentScore;
       const combinedScore = (technicalScore * 0.6) + (newsScore * 0.4);
 
       let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
@@ -188,18 +186,61 @@ Generate a trading signal. Respond with only: BUY, SELL, or HOLD followed by con
       if (combinedScore > 0.3) {
         action = 'BUY';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, positive news sentiment`;
+        reasoning = `Bullish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       } else if (combinedScore < -0.3) {
         action = 'SELL';
         confidence = Math.min(0.5 + Math.abs(combinedScore), 0.95);
-        reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, negative news sentiment`;
+        reasoning = `Bearish signals detected: RSI ${marketData.rsi?.toFixed(2)}, EMA trend ${marketData.emaTrend}, sentiment ${sentimentScore.toFixed(2)}`;
       }
 
-      return { action, confidence, reasoning };
+      return { action, confidence, reasoning, sentimentScore };
     } catch (error) {
       console.error('Trading signal generation failed:', error);
-      return { action: 'HOLD', confidence: 0.5, reasoning: 'Analysis failed' };
+      return { action: 'HOLD', confidence: 0.5, reasoning: 'Analysis failed', sentimentScore: 0 };
     }
+  }
+
+  private calculateSentimentScore(news: NewsItem[]): number {
+    if (news.length === 0) return 0;
+    
+    let totalScore = 0;
+    let totalWeight = 0;
+    
+    news.forEach(item => {
+      const weight = Math.min(item.impact / 10, 1); // Normalize impact to 0-1
+      let score = 0;
+      
+      // Convert sentiment to numeric score
+      switch (item.sentiment) {
+        case 'BULLISH':
+          score = 1;
+          break;
+        case 'BEARISH':
+          score = -1;
+          break;
+        default:
+          score = 0;
+      }
+      
+      // Additional keyword analysis
+      const text = `${item.title} ${item.content}`.toLowerCase();
+      const positiveKeywords = ['surge', 'rise', 'bull', 'positive', 'growth', 'adoption', 'upgrade', 'rally', 'moon'];
+      const negativeKeywords = ['drop', 'fall', 'bear', 'negative', 'decline', 'crash', 'regulation', 'ban', 'dump'];
+      
+      const positiveCount = positiveKeywords.filter(word => text.includes(word)).length;
+      const negativeCount = negativeKeywords.filter(word => text.includes(word)).length;
+      
+      if (positiveCount > negativeCount) {
+        score += 0.3;
+      } else if (negativeCount > positiveCount) {
+        score -= 0.3;
+      }
+      
+      totalScore += score * weight;
+      totalWeight += weight;
+    });
+    
+    return totalWeight > 0 ? Math.max(-1, Math.min(1, totalScore / totalWeight)) : 0;
   }
 
   private calculateTechnicalScore(marketData: any): number {

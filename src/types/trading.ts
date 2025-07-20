@@ -80,9 +80,22 @@ export interface MarketData {
   volume: number;
   rsi: number;
   macd: number;
+  ema12: number;
+  ema26: number;
+  emaTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  volumeRatio: number;
   bollinger: {
     upper: number;
     middle: number;
     lower: number;
   };
+}
+
+export interface TradingSignal {
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  reasoning: string;
+  sentimentScore: number;
+  marketData: MarketData;
+  newsContext: NewsItem[];
 }

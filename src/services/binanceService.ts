@@ -106,8 +106,13 @@ class BinanceService {
 
       // Calculate technical indicators (simplified)
       const prices = klines.map((k: any) => parseFloat(k[4]));
+      const volumes = klines.map((k: any) => parseFloat(k[5]));
       const rsi = this.calculateRSI(prices);
       const macd = this.calculateMACD(prices);
+      const ema12 = this.calculateEMA(prices, 12);
+      const ema26 = this.calculateEMA(prices, 26);
+      const emaTrend = this.calculateEMATrend(ema12, ema26);
+      const volumeRatio = this.calculateVolumeRatio(volumes);
       const bollinger = this.calculateBollingerBands(prices);
 
       return {
@@ -117,6 +122,10 @@ class BinanceService {
         volume: parseFloat(ticker.volume),
         rsi,
         macd,
+        ema12,
+        ema26,
+        emaTrend,
+        volumeRatio,
         bollinger,
       };
     } catch (error) {
@@ -248,6 +257,24 @@ class BinanceService {
     }
     
     return ema;
+  }
+
+  private calculateEMATrend(ema12: number, ema26: number): 'BULLISH' | 'BEARISH' | 'NEUTRAL' {
+    const diff = ema12 - ema26;
+    const threshold = ema26 * 0.001; // 0.1% threshold
+    
+    if (diff > threshold) return 'BULLISH';
+    if (diff < -threshold) return 'BEARISH';
+    return 'NEUTRAL';
+  }
+
+  private calculateVolumeRatio(volumes: number[]): number {
+    if (volumes.length < 20) return 1;
+    
+    const recentVolume = volumes[volumes.length - 1];
+    const avgVolume = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    
+    return avgVolume > 0 ? recentVolume / avgVolume : 1;
   }
 
   private calculateBollingerBands(prices: number[]): { upper: number; middle: number; lower: number } {
