@@ -358,12 +358,16 @@ class TradingBot {
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
     
-    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
+    if (!this.config.fastLearningMode) {
+      console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
+    }
     
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
       if (!marketData) {
-        console.log(`⚠️ No market data for position ${position.symbol}`);
+        if (!this.config.fastLearningMode) {
+          console.log(`⚠️ No market data for position ${position.symbol}`);
+        }
         continue;
       }
       
@@ -371,9 +375,9 @@ class TradingBot {
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
-      // More aggressive exit conditions for fast learning
-      const stopLossThreshold = this.config.fastLearningMode ? -2 : -this.config.stopLossPercent * 100; // 2% stop loss in fast mode
-      const takeProfitThreshold = this.config.fastLearningMode ? 3 : this.config.takeProfitPercent * 100; // 3% take profit in fast mode
+      // Much more aggressive exit conditions for fast learning
+      const stopLossThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? -1.5 : -this.config.stopLossPercent * 100; // 1.5% stop loss in fast mode
+      const takeProfitThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? 2 : this.config.takeProfitPercent * 100; // 2% take profit in fast mode
       
       let shouldExit = false;
       let exitReason = '';
@@ -398,7 +402,8 @@ class TradingBot {
       }
       
       if (shouldExit) {
-        console.log(`🔄 Closing position ${position.symbol} - Reason: ${exitReason}, P&L: ${position.pnlPercent.toFixed(2)}%`);
+        const logLevel = this.config.fastLearningMode ? '⚡' : '🔄';
+        console.log(`${logLevel} Closing position ${position.symbol} - Reason: ${exitReason}, P&L: ${position.pnlPercent.toFixed(2)}%`);
         await this.closePositionInternal(position, exitReason);
       }
     }
