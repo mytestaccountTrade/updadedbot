@@ -18,25 +18,14 @@ class TradingBot {
   private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
 
   constructor() {
-    this.config = {
-      mode: 'SIMULATION',
-      simulationBalance: 10000,
-      fastLearningMode: false,
-      adaptiveStrategyEnabled: true,
-      maxRiskPerTrade: 0.05, // 5% of portfolio per trade - more aggressive
-      stopLossPercent: 0.03, // 3% stop loss - tighter for faster exits
-      takeProfitPercent: 0.06, // 6% take profit - lower target for faster profits
-      maxPositions: 8, // More positions for more opportunities
-      enableNewsTrading: true,
-      enableTechnicalAnalysis: true,
-      confidenceThreshold: 0.80, // Unified 80% confidence threshold for all AI decisions
-    };
+    // Load saved config or use defaults
+    this.config = this.loadConfig();
 
     this.portfolio = {
-      totalValue: 10000,
+      totalValue: this.config.simulationBalance,
       totalPnl: 0,
       totalPnlPercent: 0,
-      availableBalance: 10000,
+      availableBalance: this.config.simulationBalance,
       positions: [],
       trades: [],
     };
@@ -45,8 +34,71 @@ class TradingBot {
     adaptiveStrategy.loadStoredData();
   }
 
+  private loadConfig(): BotConfig {
+    try {
+      const saved = localStorage.getItem('trading-bot-config');
+      if (saved) {
+        const savedConfig = JSON.parse(saved);
+        console.log('📁 Loaded saved bot configuration');
+        
+        // Merge with defaults to ensure all fields exist
+        return {
+          mode: savedConfig.mode || 'SIMULATION',
+          simulationBalance: savedConfig.simulationBalance || 10000,
+          fastLearningMode: savedConfig.fastLearningMode || false,
+          adaptiveStrategyEnabled: savedConfig.adaptiveStrategyEnabled !== undefined ? savedConfig.adaptiveStrategyEnabled : true,
+          maxRiskPerTrade: savedConfig.maxRiskPerTrade || 0.05,
+          stopLossPercent: savedConfig.stopLossPercent || 0.03,
+          takeProfitPercent: savedConfig.takeProfitPercent || 0.06,
+          maxPositions: savedConfig.maxPositions || 8,
+          enableNewsTrading: savedConfig.enableNewsTrading !== undefined ? savedConfig.enableNewsTrading : true,
+          enableTechnicalAnalysis: savedConfig.enableTechnicalAnalysis !== undefined ? savedConfig.enableTechnicalAnalysis : true,
+          confidenceThreshold: savedConfig.confidenceThreshold || 0.80,
+          apiKey: savedConfig.apiKey || '',
+          apiSecret: savedConfig.apiSecret || '',
+          llama3Url: savedConfig.llama3Url || 'http://localhost:11434',
+          llama3Model: savedConfig.llama3Model || 'llama3',
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load saved config:', error);
+    }
+    
+    // Return default config
+    console.log('📁 Using default bot configuration');
+    return {
+      mode: 'SIMULATION',
+      simulationBalance: 10000,
+      fastLearningMode: false,
+      adaptiveStrategyEnabled: true,
+      maxRiskPerTrade: 0.05,
+      stopLossPercent: 0.03,
+      takeProfitPercent: 0.06,
+      maxPositions: 8,
+      enableNewsTrading: true,
+      enableTechnicalAnalysis: true,
+      confidenceThreshold: 0.80,
+      apiKey: '',
+      apiSecret: '',
+      llama3Url: 'http://localhost:11434',
+      llama3Model: 'llama3',
+    };
+  }
+
+  private saveConfig(): void {
+    try {
+      localStorage.setItem('trading-bot-config', JSON.stringify(this.config));
+      console.log('💾 Bot configuration saved');
+    } catch (error) {
+      console.error('Failed to save config:', error);
+    }
+  }
+
   setConfig(config: Partial<BotConfig>) {
     this.config = { ...this.config, ...config };
+    
+    // Save configuration immediately
+    this.saveConfig();
     
     // Update simulation balance if changed
     if (config.simulationBalance && this.config.mode === 'SIMULATION') {
