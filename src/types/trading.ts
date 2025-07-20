@@ -59,6 +59,7 @@ export interface BotConfig {
   mode: 'SIMULATION' | 'REAL';
   simulationBalance: number;
   fastLearningMode: boolean;
+  adaptiveStrategyEnabled: boolean;
   maxRiskPerTrade: number;
   stopLossPercent: number;
   takeProfitPercent: number;

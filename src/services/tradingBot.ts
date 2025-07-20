@@ -22,6 +22,7 @@ class TradingBot {
       mode: 'SIMULATION',
       simulationBalance: 10000,
       fastLearningMode: false,
+      adaptiveStrategyEnabled: true,
       maxRiskPerTrade: 0.05, // 5% of portfolio per trade - more aggressive
       stopLossPercent: 0.03, // 3% stop loss - tighter for faster exits
       takeProfitPercent: 0.06, // 6% take profit - lower target for faster profits
@@ -216,9 +217,11 @@ class TradingBot {
       const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
       
       // Apply adaptive strategy analysis
-      const adaptiveDecision = adaptiveStrategy.shouldTrade(marketData);
+      const adaptiveDecision = this.config.adaptiveStrategyEnabled 
+        ? adaptiveStrategy.shouldTrade(marketData)
+        : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
       
-      if (!adaptiveDecision.shouldTrade) {
+      if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
         console.log(`🚫 Adaptive strategy blocked trade: ${adaptiveDecision.reason}`);
         return;
       }
