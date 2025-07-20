@@ -83,27 +83,7 @@ class BinanceService {
       
       console.log(`✅ Loaded ${this.validSymbols.size} valid trading symbols`);
     } catch (error) {
-      console.error('❌ Failed to load symbol information from API:', error);
-      console.log('🔄 Using fallback symbol configuration...');
-      
-      // Fallback: populate with common trading pairs and generic rules
-      const fallbackSymbols = [
-        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT',
-        'XRPUSDT', 'DOTUSDT', 'LINKUSDT', 'MATICUSDT', 'AVAXUSDT',
-        'LTCUSDT', 'BCHUSDT', 'UNIUSDT', 'ATOMUSDT', 'FILUSDT',
-        'TRXUSDT', 'ETCUSDT', 'XLMUSDT', 'VETUSDT', 'ICPUSDT'
-      ];
-      
-      fallbackSymbols.forEach(symbol => {
-        this.validSymbols.set(symbol, {
-          symbol: symbol,
-          minQty: 0.001,
-          stepSize: 0.001,
-          minNotional: 10
-        });
-      });
-      
-      console.log(`✅ Loaded ${this.validSymbols.size} fallback trading symbols`);
+      console.error('Failed to load symbol information:', error);
     }
   }
 
