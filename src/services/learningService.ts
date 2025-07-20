@@ -72,6 +72,9 @@ class LearningService {
   private llama3Url: string = 'http://localhost:11434';
   private llama3Model: string = 'llama3';
   private db: IDBDatabase | null = null;
+  private llama3RequestQueue: Array<() => Promise<any>> = [];
+  private llama3Available: boolean = true;
+  private llama3LastCheck: number = 0;
   
   // Throttling for learning operations
   private learningOperationThrottle: number = 5000; // 5 seconds
@@ -1020,6 +1023,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     return {
       totalTrades: this.tradeHistory.length,
       completedTrades: completedTrades.length,
+      totalWins: profitableTrades.length,
+      totalLosses: completedTrades.length - profitableTrades.length,
+      totalProfit: profitableTrades.reduce((sum, t) => sum + (t.profitPercent || 0), 0),
       winRate: completedTrades.length > 0 ? (profitableTrades.length / completedTrades.length * 100).toFixed(2) : '0',
       avgProfit: profitableTrades.length > 0 ? (profitableTrades.reduce((sum, t) => sum + (t.profitPercent || 0), 0) / profitableTrades.length).toFixed(2) : '0',
       lastLearningUpdate: new Date(this.lastLearningUpdate).toLocaleString()
@@ -1029,7 +1035,10 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   resetLearning() {
     console.log('🔄 Resetting learning service...');
     
-    // Reset learning insights but keep default structure
+    // Clear all trade history and statistics
+    this.tradeHistory = [];
+    
+    // Reset learning insights to default structure
     this.learningInsights = this.getDefaultInsights();
     this.lastLearningUpdate = 0;
     this.lastRetrainCount = 0;
@@ -1046,11 +1055,16 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     this.llama3Available = true;
     this.llama3LastCheck = 0;
     
-    // Save reset state
+    // Save reset state and clear persistent storage
+    this.saveTradeHistory();
     this.saveLearningInsights();
     
     // Clear training dataset
     localStorage.removeItem('trading-bot-training-data');
+    
+    // Clear all learning-related localStorage data
+    localStorage.removeItem('trading-bot-history');
+    localStorage.removeItem('trading-bot-insights');
     
     console.log('✅ Learning service reset complete');
   }

@@ -66,8 +66,7 @@ export interface BotConfig {
   maxPositions: number;
   enableNewsTrading: boolean;
   enableTechnicalAnalysis: boolean;
-  confidenceThreshold: number;
-  adaptiveConfidenceThreshold: number;
+  confidenceThreshold: number; // Unified confidence threshold for both AI and adaptive strategy
   apiKey?: string;
   apiSecret?: string;
   llama3Url?: string;
