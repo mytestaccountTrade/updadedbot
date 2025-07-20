@@ -14,6 +14,11 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
   const [formData, setFormData] = useState<BotConfig>(config);
 
   const handleSave = () => {
+    // Handle adaptive strategy toggle
+    if (formData.adaptiveStrategyEnabled !== config.adaptiveStrategyEnabled) {
+      (window as any).tradingBot?.toggleAdaptiveStrategy(formData.adaptiveStrategyEnabled);
+    }
+    
     onSave(formData);
   };
 

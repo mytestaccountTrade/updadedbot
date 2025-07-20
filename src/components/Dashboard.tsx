@@ -376,14 +376,6 @@ export const Dashboard: React.FC = () => {
           onClose={() => setShowSettings(false)}
         />
       )}
-
-      {/* Success Toast */}
-      {showResetToast && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2">
-          <RotateCcw className="w-5 h-5" />
-          <span>AI learning reset successfully</span>
-        </div>
-      )}
     </div>
   );
 };
