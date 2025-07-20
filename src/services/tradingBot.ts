@@ -458,8 +458,18 @@ class TradingBot {
       }
       
       position.currentPrice = marketData.price;
-      position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
-      position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
+      const priceChange = (marketData.price || 0) - (position.entryPrice || 0);
+      const multiplier = position.side === 'LONG' ? 1 : -1;
+      const size = position.size || 0;
+      const entryPrice = position.entryPrice || 0;
+      
+      position.pnl = priceChange * size * multiplier;
+      const entryValue = entryPrice * size;
+      position.pnlPercent = entryValue > 0 ? (position.pnl / entryValue) * 100 : 0;
+      
+      // Ensure no NaN values
+      if (isNaN(position.pnl)) position.pnl = 0;
+      if (isNaN(position.pnlPercent)) position.pnlPercent = 0;
       
       // Much more aggressive exit conditions for fast learning
       const stopLossThreshold = (this.config.fastLearningMode && this.config.mode === 'SIMULATION') ? -1.5 : -this.config.stopLossPercent * 100; // 1.5% stop loss in fast mode
@@ -633,12 +643,21 @@ class TradingBot {
   }
 
   private updatePortfolioMetrics() {
-    const positionsValue = this.portfolio.positions.reduce((sum, pos) => sum + (pos.size * pos.currentPrice), 0);
-    const totalPnl = this.portfolio.positions.reduce((sum, pos) => sum + pos.pnl, 0);
+    const positionsValue = this.portfolio.positions.reduce((sum, pos) => {
+      const value = (pos.size || 0) * (pos.currentPrice || 0);
+      return sum + (isNaN(value) ? 0 : value);
+    }, 0);
+    const totalPnl = this.portfolio.positions.reduce((sum, pos) => {
+      const pnl = pos.pnl || 0;
+      return sum + (isNaN(pnl) ? 0 : pnl);
+    }, 0);
     
-    this.portfolio.totalValue = this.portfolio.availableBalance + positionsValue;
-    this.portfolio.totalPnl = totalPnl;
-    this.portfolio.totalPnlPercent = (totalPnl / this.config.simulationBalance) * 100;
+    const availableBalance = this.portfolio.availableBalance || 0;
+    const simulationBalance = this.config.simulationBalance || 10000;
+    
+    this.portfolio.totalValue = isNaN(availableBalance) ? simulationBalance : availableBalance + positionsValue;
+    this.portfolio.totalPnl = isNaN(totalPnl) ? 0 : totalPnl;
+    this.portfolio.totalPnlPercent = simulationBalance > 0 ? (totalPnl / simulationBalance) * 100 : 0;
   }
 
   // Manual trading methods
