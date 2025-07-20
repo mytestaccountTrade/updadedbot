@@ -81,6 +81,21 @@ export const translations = {
     llama3UrlDescription: 'URL of your local Llama 3 instance (e.g., Ollama)',
     llama3ModelDescription: 'Model name to use for analysis',
     
+    // AI Preferences
+    aiPreferences: 'AI Preferences',
+    enableAdaptiveStrategy: 'Enable Adaptive Strategy',
+    adaptiveStrategyDescription: 'Enable the bot to learn and adapt its trading behavior based on past performance. Disable to use static strategies only.',
+    staticModeWarning: 'Static Mode: Using fixed trading rules without AI learning',
+    resetAiLearning: 'Reset AI Learning',
+    resetAiLearningDescription: 'Reset all learned patterns and confidence scores. Trade history will be preserved.',
+    resetConfirmTitle: 'Reset AI Learning',
+    resetConfirmMessage: 'Are you sure you want to reset AI learning? This will clear all learned patterns and confidence scores. This cannot be undone.',
+    resetAiLearningSuccess: 'AI learning has been reset.',
+    resetAiOnly: 'Reset AI only',
+    resetAllBotData: 'Reset All Bot Data (including trade history and stats)',
+    confidenceThreshold: 'Confidence Threshold',
+    confidenceThresholdDescription: 'Minimum confidence required for AI-based trades (only when Adaptive Strategy is enabled)',
+    
     // Sentiment
     bullish: 'BULLISH',
     bearish: 'BEARISH',
@@ -179,6 +194,21 @@ export const translations = {
     llama3Model: 'Llama 3 Model',
     llama3UrlDescription: 'Yerel Llama 3 örneğinizin URL\'si (örn. Ollama)',
     llama3ModelDescription: 'Analiz için kullanılacak model adı',
+    
+    // AI Preferences
+    aiPreferences: 'AI Tercihleri',
+    enableAdaptiveStrategy: 'Uyarlanabilir Stratejiyi Etkinleştir',
+    adaptiveStrategyDescription: 'Botun geçmiş performansa dayalı olarak öğrenmesini ve ticaret davranışını uyarlamasını sağlar. Sadece statik stratejiler kullanmak için devre dışı bırakın.',
+    staticModeWarning: 'Statik Mod: Sabit ticaret kuralları kullanılıyor, AI öğrenme yok',
+    resetAiLearning: 'AI Öğrenmeyi Sıfırla',
+    resetAiLearningDescription: 'Tüm öğrenilen kalıpları ve güven puanlarını sıfırla. Ticaret geçmişi korunacak.',
+    resetConfirmTitle: 'AI Öğrenmeyi Sıfırla',
+    resetConfirmMessage: 'AI öğrenmeyi sıfırlamak istediğinizden emin misiniz? Bu, tüm öğrenilen kalıpları ve güven puanlarını temizleyecek. Bu geri alınamaz.',
+    resetAiLearningSuccess: 'AI öğrenme sıfırlandı.',
+    resetAiOnly: 'Sadece AI\'ı sıfırla',
+    resetAllBotData: 'Tüm Bot Verilerini Sıfırla (ticaret geçmişi ve istatistikler dahil)',
+    confidenceThreshold: 'Güven Eşiği',
+    confidenceThresholdDescription: 'AI tabanlı işlemler için gereken minimum güven (sadece Uyarlanabilir Strateji etkinken)',
     
     // Sentiment
     bullish: 'YÜKSELIŞ',

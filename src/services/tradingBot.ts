@@ -29,6 +29,7 @@ class TradingBot {
       maxPositions: 8, // More positions for more opportunities
       enableNewsTrading: true,
       enableTechnicalAnalysis: true,
+      confidenceThreshold: 0.80, // Default 80% confidence threshold
     };
 
     this.portfolio = {

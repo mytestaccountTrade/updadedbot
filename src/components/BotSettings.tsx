@@ -15,24 +15,43 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
   const [formData, setFormData] = useState<BotConfig>(config);
   const [showResetToast, setShowResetToast] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetType, setResetType] = useState<'ai' | 'all'>('ai');</parameter>
 
   const handleSave = () => {
-    // Handle adaptive strategy toggle
+    // Log changes
     if (formData.adaptiveStrategyEnabled !== config.adaptiveStrategyEnabled) {
       console.log(`[AI SYSTEM] Adaptive strategy toggled ${formData.adaptiveStrategyEnabled ? 'ON' : 'OFF'}`);
+    }
+    if (formData.confidenceThreshold !== config.confidenceThreshold) {
+      console.log(`[AI SYSTEM] Confidence threshold changed to ${formData.confidenceThreshold}`);
     }
     
     onSave(formData);
   };
 
-  const handleResetAILearning = () => {
+  const handleResetAILearning = (type: 'ai' | 'all') => {
+    setResetType(type);
     setShowResetConfirm(true);
   };
 
   const confirmResetAILearning = async () => {
     try {
-      console.log('[AI SYSTEM] Learning reset manually');
-      const success = tradingBot.resetAILearning();
+      if (resetType === 'ai') {
+        console.log('[AI SYSTEM] Learning reset manually');
+        const success = tradingBot.resetAILearning();
+      } else {
+        console.log('[AI SYSTEM] All bot data reset manually');
+        // Reset all bot data including trade history
+        tradingBot.resetAILearning();
+        // Clear additional data from localStorage
+        localStorage.removeItem('trading-bot-history');
+        localStorage.removeItem('trading-bot-insights');
+        localStorage.removeItem('adaptive-strategy-patterns');
+        localStorage.removeItem('adaptive-strategy-risk');
+        localStorage.removeItem('adaptive-strategy-trades');
+        localStorage.removeItem('adaptive-strategy-reflections');
+      }
+      const success = true;
       if (success) {
         setShowResetToast(true);
         setTimeout(() => setShowResetToast(false), 3000);
@@ -55,7 +74,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
     <>
       {showResetToast && (
         <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
-          ✅ AI learning has been reset.
+          ✅ {t('resetAiLearningSuccess')}
         </div>
       )}
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -239,54 +258,97 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
           </div>
 
           {/* AI Preferences */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">🧠 AI Preferences</h3>
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">🧠 {t('aiPreferences')}</h3>
             
-            <div className="flex items-center justify-between p-4 rounded-lg border-2 border-gray-300">
-              <div>
-                <div className="font-medium text-gray-900">Enable Adaptive Strategy</div>
-                <div className="text-sm text-gray-600">
-                  Enable the bot to learn and adapt its trading behavior based on past performance. Disable to use static strategies only.
+            {/* Adaptive Strategy Toggle */}
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{t('enableAdaptiveStrategy')}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {t('adaptiveStrategyDescription')}
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => handleChange('adaptiveStrategyEnabled', !formData.adaptiveStrategyEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.adaptiveStrategyEnabled ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-                title="Enable the bot to learn and adapt its trading behavior based on past performance. Disable to use static strategies only."
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    formData.adaptiveStrategyEnabled ? 'translate-x-6' : 'translate-x-1'
+                <button
+                  onClick={() => handleChange('adaptiveStrategyEnabled', !formData.adaptiveStrategyEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.adaptiveStrategyEnabled ? 'bg-blue-600' : 'bg-gray-300'
                   }`}
-                />
-              </button>
+                  title={t('adaptiveStrategyDescription')}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.adaptiveStrategyEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              {!formData.adaptiveStrategyEnabled && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-800">
+                      📊 {t('staticModeWarning')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             
-            {!formData.adaptiveStrategyEnabled && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                  <span className="text-sm font-medium text-yellow-800">
-                    📊 Static Mode: Using fixed trading rules without AI learning
-                  </span>
+            {/* Confidence Threshold Slider */}
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('confidenceThreshold')} ({(formData.confidenceThreshold * 100).toFixed(0)}%)
+                </label>
+                <div className="text-sm text-gray-600 mb-3">
+                  {t('confidenceThresholdDescription')}
+                </div>
+                <input
+                  type="range"
+                  min="0.50"
+                  max="0.95"
+                  step="0.01"
+                  value={formData.confidenceThreshold}
+                  onChange={(e) => handleChange('confidenceThreshold', parseFloat(e.target.value))}
+                  disabled={!formData.adaptiveStrategyEnabled}
+                  className={`w-full ${!formData.adaptiveStrategyEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>50%</span>
+                  <span>95%</span>
                 </div>
               </div>
-            )}
+            </div>
             
-            <div className="pt-2">
-              <button
-                onClick={handleResetAILearning}
-                className="flex items-center space-x-2 px-4 py-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200"
-                title="Reset all learned patterns, confidence scores, and memory"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span className="font-medium">Reset AI Learning</span>
-              </button>
-              <p className="text-xs text-gray-500 mt-1">
-                Reset all learned patterns and confidence scores. Trade history will be preserved.
-              </p>
+            {/* Reset AI Learning */}
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div className="mb-4">
+                <div className="font-medium text-gray-900 mb-2">{t('resetAiLearning')}</div>
+                <div className="text-sm text-gray-600 mb-3">
+                  {t('resetAiLearningDescription')}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleResetAILearning('ai')}
+                  className="flex items-center space-x-2 px-4 py-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 w-full"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="font-medium">{t('resetAiOnly')}</span>
+                </button>
+                
+                <button
+                  onClick={() => handleResetAILearning('all')}
+                  className="flex items-center space-x-2 px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors border border-red-200 w-full"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="font-medium">{t('resetAllBotData')}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -467,23 +529,25 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               <div className="p-2 bg-red-100 rounded-lg">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Reset AI Learning</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('resetConfirmTitle')}</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to reset AI learning? This will clear all learned patterns and confidence scores. This cannot be undone.
+              {resetType === 'ai' ? t('resetConfirmMessage') : 'Are you sure you want to reset ALL bot data? This will clear trade history, statistics, and all AI learning. This cannot be undone.'}
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowResetConfirm(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={confirmResetAILearning}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className={`px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors ${
+                  resetType === 'ai' ? 'bg-purple-600' : 'bg-red-600'
+                }`}
               >
-                Reset AI Learning
+                {resetType === 'ai' ? t('resetAiOnly') : t('resetAllBotData')}
               </button>
             </div>
           </div>
