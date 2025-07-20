@@ -84,11 +84,6 @@ export const Dashboard: React.FC = () => {
     setIsRunning(!isRunning);
   };
 
-  const handleResetAILearning = () => {
-    tradingBot.resetAILearning();
-    updateLearningStats();
-  };
-
   const config = tradingBot.getConfig();
 
   return (
@@ -146,14 +141,6 @@ export const Dashboard: React.FC = () => {
                   </div>
                 )}
               </div>
-              <button
-                onClick={handleResetAILearning}
-                className="flex items-center space-x-2 px-3 py-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-                title="Reset AI Learning"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span className="text-sm font-medium">🔄 Reset AI Learning</span>
-              </button>
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
