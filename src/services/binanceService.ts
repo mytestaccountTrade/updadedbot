@@ -35,6 +35,9 @@ class BinanceService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   
+  // Cached trading pairs for throttling
+  private cachedTradingPairs: TradingPair[] = [];
+  
   // Throttling and rate limiting
   private lastTradingPairsFetch: number = 0;
   private tradingPairsThrottle: number = 30000; // 30 seconds
@@ -197,17 +200,16 @@ class BinanceService {
     }
   }
 
-  subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
-    if (this.wsConnections.has(symbol)) {
-      console.log(`Already subscribed to ${symbol}`);
-  private cachedTradingPairs: TradingPair[] = [];
-
   private getCachedTradingPairs(): TradingPair[] {
     if (this.cachedTradingPairs.length > 0) {
       return this.cachedTradingPairs;
     }
     return this.getMockTradingPairs();
   }
+
+  subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
+    if (this.wsConnections.has(symbol)) {
+      console.log(`Already subscribed to ${symbol}`);
       return;
     }
 

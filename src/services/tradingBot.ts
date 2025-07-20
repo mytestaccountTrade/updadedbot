@@ -402,17 +402,18 @@ class TradingBot {
       const pairs = tradingPairs.slice(0, 12); // Reduced from 20 to 12
       
       for (let i = 0; i < pairs.length; i += batchSize) {
+        // Check if we're at max positions before processing batch
+        if (this.portfolio.positions.length >= this.config.maxPositions) break;
+        
         const batch = pairs.slice(i, i + batchSize);
         
         // Process batch in parallel but with limited concurrency
         await Promise.all(batch.map(async (pair) => {
-        if (this.portfolio.positions.length >= this.config.maxPositions) break;
-        
         // Skip if we already have a position in this symbol
-        if (this.activePositionIds.has(pair.symbol)) continue;
+        if (this.activePositionIds.has(pair.symbol)) return;
         
         const marketData = await binanceService.getMarketData(pair.symbol);
-        if (!marketData) continue;
+        if (!marketData) return;
         
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         
