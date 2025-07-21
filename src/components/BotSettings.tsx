@@ -301,7 +301,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                 </div>
                 <input
                   type="range"
-                  min="0.50"
+                  min="0.10"
                   max="0.95"
                   step="0.01"
                   value={formData.confidenceThreshold}
