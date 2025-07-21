@@ -785,8 +785,8 @@ class TradingBot {
     
     if (this.config.enableAggressiveMode) {
       // Aggressive mode: Quick 1-2% profit target, 2% stop loss
-      stopLossThreshold = -2.0;
-      takeProfitThreshold = 1.5; // 1.5% profit target
+     stopLossThreshold = -2.5;
+     takeProfitThreshold = 1.0;
     } else if (this.config.fastLearningMode) {
       stopLossThreshold = -1.5;
       takeProfitThreshold = 2.5;
