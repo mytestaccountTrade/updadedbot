@@ -76,6 +76,9 @@ class LearningService {
   private llama3RequestQueue: Array<() => Promise<any>> = [];
   private llama3Available: boolean = true;
   private llama3LastCheck: number = 0;
+  private llama3RequestQueue: Array<() => Promise<any>> = [];
+  private llama3Available: boolean = true;
+  private llama3LastCheck: number = 0;
   
   // Throttling for learning operations
   private learningOperationThrottle: number = 5000; // 5 seconds
@@ -1056,16 +1059,14 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     this.llama3Available = true;
     this.llama3LastCheck = 0;
     
-    // Save reset state and clear persistent storage
-    this.saveTradeHistory();
-    this.saveLearningInsights();
-    
-    // Clear training dataset
-    localStorage.removeItem('trading-bot-training-data');
-    
     // Clear all learning-related localStorage data
     localStorage.removeItem('trading-bot-history');
     localStorage.removeItem('trading-bot-insights');
+    localStorage.removeItem('trading-bot-training-data');
+    
+    // Save reset state and clear persistent storage
+    this.saveTradeHistory();
+    this.saveLearningInsights();
     
     logService.learning('learningServiceResetComplete', {}, 'Learning service reset complete');
   }

@@ -32,7 +32,6 @@ class TradingBot {
     };
 
     // Load adaptive strategy setting from localStorage
-    adaptiveStrategy.loadStoredData();
   }
 
   private loadConfig(): BotConfig {
@@ -87,7 +86,9 @@ class TradingBot {
         return config;
       }
     } catch (error) {
-      logService.error('configLoadError', { error: error.message }, 'Failed to load saved config');
+      logService.error('configLoadError', { 
+        error: error instanceof Error ? error.message : String(error) 
+      }, 'Failed to load saved config');
     }
     
     // Return default config
@@ -140,7 +141,9 @@ class TradingBot {
       localStorage.setItem('trading-bot-config', JSON.stringify(this.config));
       logService.info('configSaved');
     } catch (error) {
-      logService.error('configSaveError', { error: error.message }, 'Failed to save config');
+      logService.error('configSaveError', { 
+        error: error instanceof Error ? error.message : String(error) 
+      }, 'Failed to save config');
     }
   }
 
@@ -327,18 +330,21 @@ class TradingBot {
         ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
         : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
       
-      // Log adaptive threshold for debugging
+      // Log adaptive decision
       if (this.config.adaptiveStrategyEnabled) {
-        console.log(`🎯 Adaptive threshold: ${this.config.confidenceThreshold}, Decision confidence: ${adaptiveDecision.confidence.toFixed(3)}`);
-      }
-      
-      // Log confidence threshold for debugging
-      if (this.config.adaptiveStrategyEnabled) {
-        console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Signal confidence: ${enhancedSignal.confidence.toFixed(3)}`);
+        logService.learning('adaptiveDecision', {
+          decision: adaptiveDecision.shouldTrade ? 'ALLOW' : 'BLOCK',
+          reason: adaptiveDecision.reason,
+          confidence: adaptiveDecision.confidence.toFixed(3),
+          threshold: this.config.confidenceThreshold.toFixed(3)
+        });
       }
       
       if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
-        console.log(`🚫 Adaptive strategy blocked trade: ${adaptiveDecision.reason}`);
+        logService.warning('tradeBlocked', {
+          symbol: marketData.symbol,
+          reason: adaptiveDecision.reason
+        });
         return;
       }
       
@@ -350,7 +356,12 @@ class TradingBot {
         reasoning: `${enhancedSignal.reasoning} | ${adaptiveDecision.reason}`
       };
       
-      console.log(`🔍 ${marketData.symbol}: ${enhancedSignal.action} (confidence: ${enhancedSignal.confidence.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}, Sentiment: ${enhancedSignal.sentimentScore.toFixed(1)})`);
+      logService.info('signalEvaluation', {
+        symbol: marketData.symbol,
+        action: enhancedSignal.action,
+        confidence: enhancedSignal.confidence.toFixed(3),
+        threshold: this.config.confidenceThreshold.toFixed(3)
+      });
       
       // Fast learning trading logic
       const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
@@ -362,24 +373,35 @@ class TradingBot {
         // If random trade, pick random action
         if (randomTrade && !shouldTrade) {
           action = Math.random() > 0.5 ? 'BUY' : 'SELL';
-          console.log(`🎲 Random exploration trade: ${action} ${marketData.symbol}`);
+          logService.learning('randomExplorationTrade', {
+            action,
+            symbol: marketData.symbol
+          });
         }
         
-        console.log(`⚡ WebSocket Fast Learning Trade: ${action} ${marketData.symbol} (confidence: ${enhancedSignal.confidence.toFixed(2)})`);
+        logService.learning('fastLearningTradeExecuted', {
+          action,
+          symbol: marketData.symbol,
+          confidence: enhancedSignal.confidence.toFixed(2)
+        });
         await this.executeTrade(marketData.symbol, action, marketData, finalSignal, adaptiveDecision.strategy);
         
         this.fastLearningTradeCount++;
         this.lastFastLearningTrade = now;
         
-        // Log detailed trade information
-        console.log(`📊 Trade Details: RSI: ${marketData.rsi.toFixed(1)}, MACD: ${marketData.macd.toFixed(4)}, EMA Trend: ${marketData.emaTrend}, Confidence: ${enhancedSignal.confidence.toFixed(2)}`);
-        console.log(`💰 Portfolio: $${this.portfolio.totalValue.toFixed(2)} total, $${this.portfolio.availableBalance.toFixed(2)} available, ${this.portfolio.positions.length}/${this.config.maxPositions} positions`);
+        // Log portfolio status
+        logService.info('portfolioStatus', {
+          positions: this.portfolio.positions.length,
+          totalValue: this.portfolio.totalValue.toFixed(2),
+          totalPnl: this.portfolio.totalPnl.toFixed(2)
+        });
         
         // Trigger learning every 3-5 trades (randomized)
         const retrainInterval = 3 + Math.floor(Math.random() * 3); // 3-5 trades
         if (this.fastLearningTradeCount % retrainInterval === 0) {
-          console.log(`🧠 Fast Learning: Triggering retraining after ${this.fastLearningTradeCount} trades...`);
-          console.log(`📊 Portfolio: $${this.portfolio.totalValue.toFixed(2)} total, $${this.portfolio.totalPnl.toFixed(2)} P&L, ${this.portfolio.positions.length} positions`);
+          logService.learning('earlyRetraining', {
+            tradeCount: this.fastLearningTradeCount
+          });
           await learningService.retrainModel();
         }
       }
