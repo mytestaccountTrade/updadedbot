@@ -80,6 +80,8 @@ class TradingBot {
           trailingStopPercent: savedConfig.trailingStopPercent || 0.01,
           // Simulation replay settings
           enableSimulationReplay: savedConfig.enableSimulationReplay !== undefined ? savedConfig.enableSimulationReplay : false
+          // Aggressive mode settings
+          enableAggressiveMode: savedConfig.enableAggressiveMode !== undefined ? savedConfig.enableAggressiveMode : false
         };
         return config;
       }
@@ -130,7 +132,9 @@ class TradingBot {
       enableTrailingStop: false,
       trailingStopPercent: 0.01,
       // Simulation replay settings
-      enableSimulationReplay: false
+      enableSimulationReplay: false,
+      // Aggressive mode settings
+      enableAggressiveMode: false
     };
   }
 
@@ -307,7 +311,9 @@ class TradingBot {
       }
       
       // Skip if we're at max positions
-      if (this.portfolio.positions.length >= this.config.maxPositions) {
+      // Aggressive mode: Allow up to 40 positions, normal mode: use configured max
+      const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
+      if (this.portfolio.positions.length >= maxPositions) {
         return;
       }
       
@@ -571,7 +577,9 @@ class TradingBot {
       
       for (let i = 0; i < pairs.length; i += batchSize) {
         // Check if we've reached max positions before processing batch
-        if (this.portfolio.positions.length >= this.config.maxPositions) break;
+        // Aggressive mode: Allow up to 40 positions, normal mode: use configured max
+        const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
+        if (this.portfolio.positions.length >= maxPositions) break;
         
         const batch = pairs.slice(i, i + batchSize);
         
@@ -608,7 +616,9 @@ class TradingBot {
           console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
           
           // More aggressive entry - lower confidence threshold
-          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold) {
+          // Aggressive mode: Use lower confidence threshold and faster decision making
+          const confidenceThreshold = this.config.enableAggressiveMode ? 0.4 : this.config.confidenceThreshold;
+          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > confidenceThreshold) {
             console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
@@ -769,9 +779,21 @@ class TradingBot {
   }
 
   private checkTraditionalExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
-    // Dynamic thresholds based on mode and market conditions
-    const stopLossThreshold = this.config.fastLearningMode ? -1.5 : -this.config.stopLossPercent * 100;
-    const takeProfitThreshold = this.config.fastLearningMode ? 2.5 : this.config.takeProfitPercent * 100;
+    // Aggressive mode: Quick exits with lower profit targets and tighter stop losses
+    let stopLossThreshold: number;
+    let takeProfitThreshold: number;
+    
+    if (this.config.enableAggressiveMode) {
+      // Aggressive mode: Quick 1-2% profit target, 2% stop loss
+      stopLossThreshold = -2.0;
+      takeProfitThreshold = 1.5; // 1.5% profit target
+    } else if (this.config.fastLearningMode) {
+      stopLossThreshold = -1.5;
+      takeProfitThreshold = 2.5;
+    } else {
+      stopLossThreshold = -this.config.stopLossPercent * 100;
+      takeProfitThreshold = this.config.takeProfitPercent * 100;
+    }
       
     // Adaptive thresholds based on volatility
     const volatility = marketData.bollinger ? 
@@ -984,28 +1006,49 @@ class TradingBot {
   private validateTradeEntry(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, marketCondition: any, signal?: any): { valid: boolean; reason: string } {
     const { rsi, macd, volumeRatio, emaTrend } = marketData;
     
-    // Check for conflicting signals
-    let conflictCount = 0;
-    let totalSignals = 0;
+    // Aggressive mode: Simplified validation based on EMA trend and volume only
+    if (this.config.enableAggressiveMode) {
+      // Aggressive mode: Only check EMA trend and volume spikes
+      if (volumeRatio < 1.2) {
+        return { valid: false, reason: 'AGGRESSIVE_LOW_VOLUME' };
+      }
+      
+      // Allow trades based on EMA trend alignment
+      if (emaTrend === 'BEARISH' && action === 'BUY') {
+        return { valid: false, reason: 'AGGRESSIVE_TREND_CONFLICT' };
+      }
+      if (emaTrend === 'BULLISH' && action === 'SELL') {
+        return { valid: false, reason: 'AGGRESSIVE_TREND_CONFLICT' };
+      }
+      
+      return { valid: true, reason: 'AGGRESSIVE_ENTRY_VALIDATED' };
+    }
     
-    // RSI vs Action conflict
-    if (rsi > 70 && action === 'BUY') conflictCount++;
-    if (rsi < 30 && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // MACD vs Action conflict
-    if (macd < 0 && action === 'BUY') conflictCount++;
-    if (macd > 0 && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // EMA Trend vs Action conflict
-    if (emaTrend === 'BEARISH' && action === 'BUY') conflictCount++;
-    if (emaTrend === 'BULLISH' && action === 'SELL') conflictCount++;
-    totalSignals++;
-    
-    // Too many conflicts
-    if (conflictCount >= 2) {
-      return { valid: false, reason: 'CONFLICTING_INDICATORS' };
+    // Normal mode: Full validation with conflicting signals check
+    else {
+      // Check for conflicting signals
+      let conflictCount = 0;
+      let totalSignals = 0;
+      
+      // RSI vs Action conflict
+      if (rsi > 70 && action === 'BUY') conflictCount++;
+      if (rsi < 30 && action === 'SELL') conflictCount++;
+      totalSignals++;
+      
+      // MACD vs Action conflict
+      if (macd < 0 && action === 'BUY') conflictCount++;
+      if (macd > 0 && action === 'SELL') conflictCount++;
+      totalSignals++;
+      
+      // EMA Trend vs Action conflict
+      if (emaTrend === 'BEARISH' && action === 'BUY') conflictCount++;
+      if (emaTrend === 'BULLISH' && action === 'SELL') conflictCount++;
+      totalSignals++;
+      
+      // Too many conflicts
+      if (conflictCount >= 2) {
+        return { valid: false, reason: 'CONFLICTING_INDICATORS' };
+      }
     }
     
     // Low volume validation

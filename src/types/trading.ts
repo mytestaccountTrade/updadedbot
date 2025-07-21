@@ -86,6 +86,8 @@ export interface BotConfig {
   trailingStopPercent: number; // Decimal format: 0.01 = 1%
   // Simulation Replay Settings
   enableSimulationReplay: boolean;
+  // Aggressive mode settings
+  enableAggressiveMode: boolean;
 }
 
 export interface AppSettings {
