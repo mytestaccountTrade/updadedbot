@@ -344,6 +344,302 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
             </div>
           </div>
 
+        {/* Multi-Strategy Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">🔀 {t('multiStrategySettings')}</h3>
+          
+          <div className="p-4 rounded-lg border-2 border-gray-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">{t('enableMultiStrategy')}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {t('multiStrategyDescription')}
+                </div>
+              </div>
+              <button
+                onClick={() => handleChange('enableMultiStrategy', !formData.enableMultiStrategy)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.enableMultiStrategy ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.enableMultiStrategy ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {formData.enableMultiStrategy && (
+              <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
+                {/* RSI + MACD Strategy */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => handleChange('strategies', {
+                        ...formData.strategies,
+                        rsiMacd: { ...formData.strategies.rsiMacd, enabled: !formData.strategies.rsiMacd.enabled }
+                      })}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        formData.strategies.rsiMacd.enabled ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          formData.strategies.rsiMacd.enabled ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm font-medium text-gray-900">{t('rsiMacdStrategy')}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{t('strategyWeight')}:</span>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2.0"
+                      step="0.1"
+                      value={formData.strategies.rsiMacd.weight}
+                      onChange={(e) => handleChange('strategies', {
+                        ...formData.strategies,
+                        rsiMacd: { ...formData.strategies.rsiMacd, weight: parseFloat(e.target.value) }
+                      })}
+                      className="w-16"
+                      disabled={!formData.strategies.rsiMacd.enabled}
+                    />
+                    <span className="text-xs text-gray-600 w-8">{formData.strategies.rsiMacd.weight.toFixed(1)}</span>
+                  </div>
+                </div>
+                
+                {/* News Sentiment Strategy */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => handleChange('strategies', {
+                        ...formData.strategies,
+                        newsSentiment: { ...formData.strategies.newsSentiment, enabled: !formData.strategies.newsSentiment.enabled }
+                      })}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        formData.strategies.newsSentiment.enabled ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          formData.strategies.newsSentiment.enabled ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm font-medium text-gray-900">{t('newsSentimentStrategy')}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{t('strategyWeight')}:</span>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2.0"
+                      step="0.1"
+                      value={formData.strategies.newsSentiment.weight}
+                      onChange={(e) => handleChange('strategies', {
+                        ...formData.strategies,
+                        newsSentiment: { ...formData.strategies.newsSentiment, weight: parseFloat(e.target.value) }
+                      })}
+                      className="w-16"
+                      disabled={!formData.strategies.newsSentiment.enabled}
+                    />
+                    <span className="text-xs text-gray-600 w-8">{formData.strategies.newsSentiment.weight.toFixed(1)}</span>
+                  </div>
+                </div>
+                
+                {/* Volume Spike Strategy */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => handleChange('strategies', {
+                        ...formData.strategies,
+                        volumeSpike: { ...formData.strategies.volumeSpike, enabled: !formData.strategies.volumeSpike.enabled }
+                      })}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        formData.strategies.volumeSpike.enabled ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          formData.strategies.volumeSpike.enabled ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm font-medium text-gray-900">{t('volumeSpikeStrategy')}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{t('strategyWeight')}:</span>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2.0"
+                      step="0.1"
+                      value={formData.strategies.volumeSpike.weight}
+                      onChange={(e) => handleChange('strategies', {
+                        ...formData.strategies,
+                        volumeSpike: { ...formData.strategies.volumeSpike, weight: parseFloat(e.target.value) }
+                      })}
+                      className="w-16"
+                      disabled={!formData.strategies.volumeSpike.enabled}
+                    />
+                    <span className="text-xs text-gray-600 w-8">{formData.strategies.volumeSpike.weight.toFixed(1)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Auto-Rebalance Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">⚖️ {t('autoRebalanceSettings')}</h3>
+          
+          <div className="p-4 rounded-lg border-2 border-gray-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">{t('enableAutoRebalance')}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {t('autoRebalanceDescription')}
+                </div>
+              </div>
+              <button
+                onClick={() => handleChange('enableAutoRebalance', !formData.enableAutoRebalance)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.enableAutoRebalance ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.enableAutoRebalance ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {formData.enableAutoRebalance && (
+              <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('scaleInThreshold')} ({(formData.scaleInThreshold * 100).toFixed(1)}%)
+                  </label>
+                  <input
+                    type="range"
+                    min="0.01"
+                    max="0.1"
+                    step="0.001"
+                    value={formData.scaleInThreshold}
+                    onChange={(e) => handleChange('scaleInThreshold', parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>1%</span>
+                    <span>10%</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('scaleOutThreshold')} ({(Math.abs(formData.scaleOutThreshold) * 100).toFixed(1)}%)
+                  </label>
+                  <input
+                    type="range"
+                    min="-0.05"
+                    max="-0.005"
+                    step="0.001"
+                    value={formData.scaleOutThreshold}
+                    onChange={(e) => handleChange('scaleOutThreshold', parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>-5%</span>
+                    <span>-0.5%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Trailing Stop */}
+          <div className="p-4 rounded-lg border-2 border-gray-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">{t('enableTrailingStop')}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Automatically move stop loss to secure profits as price moves favorably
+                </div>
+              </div>
+              <button
+                onClick={() => handleChange('enableTrailingStop', !formData.enableTrailingStop)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  formData.enableTrailingStop ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    formData.enableTrailingStop ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {formData.enableTrailingStop && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('trailingStopPercent')} ({(formData.trailingStopPercent * 100).toFixed(1)}%)
+                  </label>
+                  <input
+                    type="range"
+                    min="0.005"
+                    max="0.05"
+                    step="0.001"
+                    value={formData.trailingStopPercent}
+                    onChange={(e) => handleChange('trailingStopPercent', parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0.5%</span>
+                    <span>5%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Simulation Replay */}
+        {formData.mode === 'SIMULATION' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">🧪 {t('simulationReplay')}</h3>
+            
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{t('enableSimulationReplay')}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {t('simulationReplayDescription')}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleChange('enableSimulationReplay', !formData.enableSimulationReplay)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.enableSimulationReplay ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.enableSimulationReplay ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
           {/* Risk Management */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">{t('riskManagement')}</h3>

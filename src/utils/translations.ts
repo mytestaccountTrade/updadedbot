@@ -212,6 +212,32 @@ export const translations = {
     confidenceThreshold: 'Güven Eşiği',
     confidenceThresholdDescription: 'Tüm AI tabanlı işlemler ve uyarlanabilir strateji kararları için gereken minimum güven seviyesi. Hem AI sinyal üretimi hem de uyarlanabilir strateji filtrelemesi tarafından kullanılır.',
     
+    // Multi-Strategy Settings
+    multiStrategySettings: 'Çoklu Strateji Ayarları',
+    enableMultiStrategy: 'Çoklu Stratejiyi Etkinleştir',
+    multiStrategyDescription: 'Birden fazla AI stratejisini paralel çalıştır ve sinyallerini birleştir',
+    rsiMacdStrategy: 'RSI + MACD Stratejisi',
+    newsSentimentStrategy: 'Haber Duygu Stratejisi',
+    volumeSpikeStrategy: 'Hacim Artışı Stratejisi',
+    strategyWeight: 'Ağırlık',
+    
+    // Auto-Rebalance Settings
+    autoRebalanceSettings: 'Otomatik Dengeleme ve Pozisyon Ölçeklendirme',
+    enableAutoRebalance: 'Otomatik Dengelemeyi Etkinleştir',
+    autoRebalanceDescription: 'Performansa göre pozisyonları otomatik olarak artır/azalt',
+    scaleInThreshold: 'Artırma Eşiği',
+    scaleOutThreshold: 'Azaltma Eşiği',
+    enableTrailingStop: 'Takip Eden Stop\'u Etkinleştir',
+    trailingStopPercent: 'Takip Eden Stop %',
+    
+    // Simulation Replay
+    simulationReplay: 'Simülasyon Tekrarı',
+    enableSimulationReplay: 'Simülasyon Tekrarını Etkinleştir',
+    simulationReplayDescription: 'Stratejileri geçmiş verilerle test et',
+    runReplay: 'Tekrarı Çalıştır',
+    selectDate: 'Tarih Seç',
+    replayResults: 'Tekrar Sonuçları',
+    
     // Sentiment
     bullish: 'YÜKSELIŞ',
     bearish: 'DÜŞÜŞ',

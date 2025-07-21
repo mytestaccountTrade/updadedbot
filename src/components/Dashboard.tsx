@@ -340,6 +340,12 @@ export const Dashboard: React.FC = () => {
                 <NewsPanel news={news} />
               </div>
             )}
+            
+            {activeTab === 'replay' && (
+              <div>
+                <SimulationReplayPanel />
+              </div>
+            )}
           </div>
         </div>
       </div>
