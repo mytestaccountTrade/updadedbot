@@ -64,35 +64,19 @@ class TradingBot {
           strategies: {
             rsiMacd: {
               enabled: savedConfig.strategies?.rsiMacd?.enabled !== undefined ? savedConfig.strategies.rsiMacd.enabled : true,
-              weight: savedConfig.strategies?.rsiMacd?.weight || 1.0
-            },
-            newsSentiment: {
-              enabled: savedConfig.strategies?.newsSentiment?.enabled !== undefined ? savedConfig.strategies.newsSentiment.enabled : true,
-              weight: savedConfig.strategies?.newsSentiment?.weight || 1.0
-            },
-            volumeSpike: {
-              enabled: savedConfig.strategies?.volumeSpike?.enabled !== undefined ? savedConfig.strategies.volumeSpike.enabled : true,
-              weight: savedConfig.strategies?.volumeSpike?.weight || 1.0
-            }
-          },
+          enableAutoRebalance: false,
+          scaleInThreshold: 0.02,
+          scaleOutThreshold: -0.015,
+          enableTrailingStop: false,
+          trailingStopPercent: 0.02,
           // Auto-rebalance settings
-          autoRebalance: {
-            enabled: savedConfig.autoRebalance?.enabled || false,
-            scaleInEnabled: savedConfig.autoRebalance?.scaleInEnabled || false,
-            scaleOutEnabled: savedConfig.autoRebalance?.scaleOutEnabled || false,
-            trailingStopEnabled: savedConfig.autoRebalance?.trailingStopEnabled || false,
-            scaleInThreshold: savedConfig.autoRebalance?.scaleInThreshold || 2.0,
-            scaleOutThreshold: savedConfig.autoRebalance?.scaleOutThreshold || -1.5,
-            trailingStopPercent: savedConfig.autoRebalance?.trailingStopPercent || 2.0,
-            maxScaleIns: savedConfig.autoRebalance?.maxScaleIns || 3,
-            maxScaleOuts: savedConfig.autoRebalance?.maxScaleOuts || 3
-          },
+          enableAutoRebalance: savedConfig.enableAutoRebalance !== undefined ? savedConfig.enableAutoRebalance : false,
+          scaleInThreshold: savedConfig.scaleInThreshold || 0.02,
+          scaleOutThreshold: savedConfig.scaleOutThreshold || -0.015,
+          enableTrailingStop: savedConfig.enableTrailingStop !== undefined ? savedConfig.enableTrailingStop : false,
+          trailingStopPercent: savedConfig.trailingStopPercent || 0.02,
           // Simulation replay settings
-          simulationReplay: {
-            enabled: savedConfig.simulationReplay?.enabled || false
-          }
-        };
-        return config;
+          enableSimulationReplay: false
       }
     } catch (error) {
       console.error('Failed to load saved config:', error);
