@@ -1033,7 +1033,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   resetLearning() {
-    console.log('🔄 Resetting learning service...');
+    logService.learning('learningServiceReset', {}, 'Resetting learning service');
     
     // Clear all trade history and statistics
     this.tradeHistory = [];
@@ -1066,7 +1066,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     localStorage.removeItem('trading-bot-history');
     localStorage.removeItem('trading-bot-insights');
     
-    console.log('✅ Learning service reset complete');
+    logService.learning('learningServiceResetComplete', {}, 'Learning service reset complete');
   }
 }
 

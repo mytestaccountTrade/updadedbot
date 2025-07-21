@@ -615,7 +615,7 @@ class AdaptiveStrategyService {
   }
 
   resetLearning() {
-    logService.info('adaptiveStrategyReset', {}, 'Resetting adaptive strategy learning');
+    logService.learning('adaptiveStrategyReset', {}, 'Resetting adaptive strategy learning');
     
     // Reset learned patterns
     this.learnedPatterns = [];
@@ -639,7 +639,7 @@ class AdaptiveStrategyService {
     // Save reset state
     this.saveStoredData();
     
-    logService.info('adaptiveStrategyResetComplete', {}, 'Adaptive strategy learning reset complete');
+    logService.learning('adaptiveStrategyResetComplete', {}, 'Adaptive strategy learning reset complete');
   }
 }
 

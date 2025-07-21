@@ -570,7 +570,7 @@ Respond with: ACTION CONFIDENCE REASONING`;
   }
 
   resetLearning() {
-    console.log('🔄 Resetting news service learning...');
+    logService.info('newsServiceReset', {}, 'Resetting news service learning');
     
     // Reset Llama 3 throttling and health monitoring
     this.llama3LastCheck = 0;
@@ -579,7 +579,7 @@ Respond with: ACTION CONFIDENCE REASONING`;
     this.llama3RequestQueue = [];
     this.activeLlama3Requests = 0;
     
-    console.log('✅ News service learning reset complete');
+    logService.info('newsServiceResetComplete', {}, 'News service learning reset complete');
   }
 
   private extractCoinsFromText(text: string): string[] {

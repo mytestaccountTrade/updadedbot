@@ -6,6 +6,7 @@ import { adaptiveStrategy } from './adaptiveStrategy';
 import { multiStrategyService } from './multiStrategyService';
 import { positionScalingService } from './positionScalingService';
 import { logService } from './logService';
+import { logService } from './logService';
 
 class TradingBot {
   private config: BotConfig;
@@ -213,7 +214,7 @@ class TradingBot {
     // Set global flag for fast learning mode
     (globalThis as any).fastLearningMode = this.config.fastLearningMode;
     
-    console.log(`Trading bot started in ${this.config.mode} mode`);
+    logService.info('botStarted', { mode: this.config.mode });
     
     // Subscribe to WebSocket data for top trading pairs
     this.initializeWebSocketSubscriptions();
@@ -225,7 +226,7 @@ class TradingBot {
     }
     
     if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
-      console.log('🚀 Fast Learning Mode activated - WebSocket-driven aggressive trading');
+      logService.info('fastLearningActivated', {}, 'Fast Learning Mode activated - WebSocket-driven aggressive trading');
       // Fast learning is now driven by WebSocket updates, not intervals
     } else {
       // Run trading loop every 10 seconds for normal execution
@@ -256,7 +257,7 @@ class TradingBot {
     binanceService.disconnectAll();
     this.subscribedSymbols.clear();
     
-    console.log('Trading bot stopped');
+    logService.info('botStopped');
   }
 
   isActive(): boolean {
@@ -277,9 +278,9 @@ class TradingBot {
         }
       }
       
-      console.log(`📡 Subscribed to ${topPairs.length} WebSocket streams`);
+      logService.info('websocketSubscribed', { count: topPairs.length }, `Subscribed to ${topPairs.length} WebSocket streams`);
     } catch (error) {
-      console.error('Failed to initialize WebSocket subscriptions:', error);
+      logService.error('websocketSubscriptionFailed', { error: error.message }, 'Failed to initialize WebSocket subscriptions');
     }
   }
 
@@ -1170,7 +1171,7 @@ class TradingBot {
   }
 
   resetAllBotData() {
-    logService.info('allBotDataReset', {}, 'Resetting ALL bot data (AI learning + trade history + statistics)');
+    logService.warning('allBotDataReset', {}, 'Resetting ALL bot data (AI learning + trade history + statistics)');
     
     // Reset AI learning first
     this.resetAILearning();
@@ -1206,7 +1207,7 @@ class TradingBot {
     localStorage.removeItem('multi-strategy-performance');
     localStorage.removeItem('position-scaling-data');
     
-    logService.info('allBotDataResetComplete', {}, 'Complete bot data reset finished - all history and statistics cleared');
+    logService.warning('allBotDataResetComplete', {}, 'Complete bot data reset finished - all history and statistics cleared');
     
     return true;
   }
