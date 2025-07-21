@@ -456,7 +456,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                     <button
                       onClick={() => handleChange('strategies', {
                         ...formData.strategies,
-                        volumeSpike: { ...formData.strategies.volumeSpike, enabled: !formData.strategies.volumeSpike.enabled }
+                        volumeSpike: { ...formData.strategies.volumeSpike.enabled, enabled: !formData.strategies.volumeSpike.enabled }
                       })}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                         formData.strategies.volumeSpike.enabled ? 'bg-green-600' : 'bg-gray-300'
@@ -639,6 +639,41 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
             </div>
           </div>
         )}
+
+        {/* Aggressive Mode */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">⚡ Aggressive Mode</label>
+          <div className="flex items-center justify-between p-4 rounded-lg border-2 border-gray-300">
+            <div>
+              <div className="font-medium text-gray-900">Enable Aggressive Mode</div>
+              <div className="text-sm text-gray-600">
+                Fast trading with 1-2% profit targets, up to 40 positions, reduced validation checks
+              </div>
+            </div>
+            <button
+              onClick={() => handleChange('enableAggressiveMode', !formData.enableAggressiveMode)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                formData.enableAggressiveMode ? 'bg-red-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  formData.enableAggressiveMode ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          {formData.enableAggressiveMode && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span className="text-sm font-medium text-red-800">
+                  ⚡ Aggressive Mode: 1-2% profit targets, up to 40 positions, faster execution
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
 
           {/* Risk Management */}
           <div className="space-y-4">

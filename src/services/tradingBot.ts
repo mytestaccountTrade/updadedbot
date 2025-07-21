@@ -927,13 +927,9 @@ class TradingBot {
       return;
     }
     
-    // Aggressive mode: Ignore minNotional or make it optional (lower threshold)
-    const minTradeValue = this.config.enableAggressiveMode ? 5 : 10;
-    if (quantity * marketData.price < minTradeValue) {
-      logService.warning('tradeBlocked', {
-        symbol,
-        reason: `Trade too small: $${(quantity * marketData.price).toFixed(2)} < $${minTradeValue} minimum`
-      });
+    // Minimum trade validation
+    if (quantity * marketData.price < 10) {
+      console.log(`⚠️ Trade too small for ${symbol}: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`);
       return;
     }
     
@@ -1057,7 +1053,7 @@ class TradingBot {
     
     // Low volume validation
     if (volumeRatio < 0.5) {
-      return { valid: false, reason: 'LOW_VOLUME' };
+      return { valid: false, reason: this.config.enableAggressiveMode ? 'AGGRESSIVE_LOW_VOLUME' : 'LOW_VOLUME' };
     }
     
     // Market condition validation
