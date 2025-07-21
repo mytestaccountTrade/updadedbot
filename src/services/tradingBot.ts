@@ -278,7 +278,7 @@ class TradingBot {
       
       logService.info('websocketSubscribed', { count: topPairs.length }, `Subscribed to ${topPairs.length} WebSocket streams`);
     } catch (error) {
-      logService.error('websocketSubscriptionFailed', { error: error.message }, 'Failed to initialize WebSocket subscriptions');
+      logService.error('websocketSubscriptionFailed', {   error: error instanceof Error ? error.message : String(error)  }, 'Failed to initialize WebSocket subscriptions');
     }
   }
 
