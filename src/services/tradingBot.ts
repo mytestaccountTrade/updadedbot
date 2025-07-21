@@ -87,7 +87,7 @@ class TradingBot {
         return config;
       }
     } catch (error) {
-      logService.error('configLoadError', { error: error instanceof Error ? error.message : String(error) }, 'Failed to load saved config');
+      logService.error('configLoadError', { error: error.message }, 'Failed to load saved config');
     }
     
     // Return default config
@@ -140,7 +140,7 @@ class TradingBot {
       localStorage.setItem('trading-bot-config', JSON.stringify(this.config));
       logService.info('configSaved');
     } catch (error) {
-      logService.error('configSaveError', { error: error instanceof Error ? error.message : String(error) }, 'Failed to save config');
+      logService.error('configSaveError', { error: error.message }, 'Failed to save config');
     }
   }
 
@@ -387,7 +387,7 @@ class TradingBot {
     } catch (error) {
       logService.error('fastLearningLoopError', { 
         symbol: marketData.symbol, 
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error) 
       }, `Fast learning loop error for ${marketData.symbol}`);
     }
   }
@@ -599,7 +599,7 @@ class TradingBot {
       
     } catch (error) {
       logService.error('tradingLoopError', { 
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error) 
       }, 'Trading loop error');
     }
   }
