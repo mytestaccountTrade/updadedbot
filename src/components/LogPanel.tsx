@@ -13,16 +13,16 @@ export const LogPanel: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Subscribe to log updates
-    const unsubscribe = logService.subscribe((newLogs) => {
-      setLogs(newLogs);
-    });
+  // Subscribe to log updates
+  const unsubscribe = logService.subscribe((newLogs) => {
+    setLogs([...newLogs].reverse()); // yeni loglar aşağıya eklensin
+  });
 
-    // Load initial logs
-    setLogs(logService.getLogs());
+  // Load initial logs
+  setLogs([...logService.getLogs()].reverse()); // başta da aynı şekilde
 
-    return unsubscribe;
-  }, []);
+  return unsubscribe;
+}, []);
 
   useEffect(() => {
     // Auto-scroll to bottom when new logs arrive
