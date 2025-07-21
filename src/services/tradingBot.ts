@@ -85,7 +85,7 @@ class TradingBot {
       }
     } catch (error) {
       logService.error('configLoadError', { 
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error) 
       }, 'Failed to load saved config');
     }
     
@@ -140,7 +140,7 @@ class TradingBot {
       logService.info('configSaved');
     } catch (error) {
       logService.error('configSaveError', { 
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error) 
       }, 'Failed to save config');
     }
   }
@@ -775,14 +775,14 @@ class TradingBot {
     const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
     const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
       
-    // Check stop loss
+      // Check stop loss
     if (position.pnlPercent <= adaptiveStopLoss) {
       return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
-    }
-    // Check take profit
+      }
+      // Check take profit
     if (position.pnlPercent >= adaptiveTakeProfit) {
       return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
-    }
+      }
     
     return { shouldExit: false, reason: '' };
   }
