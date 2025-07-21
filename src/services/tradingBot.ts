@@ -573,7 +573,7 @@ class TradingBot {
       
       // Process trading pairs in batches to prevent resource overload
       const batchSize = 3;
-      const pairs = tradingPairs.slice(0, 12); // Reduced from 20 to 12
+      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 25 : 12);
       
       for (let i = 0; i < pairs.length; i += batchSize) {
         // Check if we've reached max positions before processing batch
