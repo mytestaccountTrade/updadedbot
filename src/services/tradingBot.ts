@@ -3,9 +3,6 @@ import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
 import { adaptiveStrategy } from './adaptiveStrategy';
-import { multiStrategyService } from './multiStrategyService';
-import { positionScalingService } from './positionScalingService';
-import { logService } from './logService';
 import { logService } from './logService';
 
 class TradingBot {
@@ -388,7 +385,10 @@ class TradingBot {
       }
       
     } catch (error) {
-      console.error(`WebSocket Fast Learning error for ${marketData.symbol}:`, error);
+      logService.error('fastLearningLoopError', { 
+        symbol: marketData.symbol, 
+        error: error instanceof Error ? error.message : String(error) 
+      }, `Fast learning loop error for ${marketData.symbol}`);
     }
   }
 
@@ -519,7 +519,9 @@ class TradingBot {
       this.updatePortfolioMetrics();
       
     } catch (error) {
-      console.error('Fast learning loop error:', error);
+      logService.error('fastLearningLoopError', { 
+        error: error instanceof Error ? error.message : String(error) 
+      }, 'Fast learning loop error');
     }
   }
 
@@ -596,7 +598,9 @@ class TradingBot {
       this.updatePortfolioMetrics();
       
     } catch (error) {
-      console.error('Trading loop error:', error);
+      logService.error('tradingLoopError', { 
+        error: error instanceof Error ? error.message : String(error) 
+      }, 'Trading loop error');
     }
   }
 

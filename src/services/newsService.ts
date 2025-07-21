@@ -1,4 +1,5 @@
 import { NewsItem } from '../types/trading';
+import { logService } from './logService';
 
 class NewsService {
   private cachedNews: NewsItem[] = [];
@@ -470,13 +471,15 @@ Respond with: ACTION CONFIDENCE REASONING`;
         this.llama3Available = response.ok;
         
         if (!this.llama3Available) {
-          console.warn('🔴 Llama 3 health check failed - server not responding properly');
+          logService.warning('llama3HealthCheckFailed', {}, 'Llama 3 health check failed - server not responding properly');
         } else {
-          console.log('🟢 Llama 3 health check passed');
+          logService.info('llama3HealthCheckPassed', {}, 'Llama 3 health check passed');
         }
       } catch (error) {
         this.llama3Available = false;
-        console.warn('🔴 Llama 3 health check failed:', error instanceof Error ? error.message : 'Unknown error');
+        logService.warning('llama3HealthCheckError', { 
+          error: error instanceof Error ? error.message : String(error) 
+        }, 'Llama 3 health check failed');
       }
     }
     
@@ -542,7 +545,9 @@ Respond with: ACTION CONFIDENCE REASONING`;
       if (error instanceof Error && error.name === 'AbortError') {
         console.warn('🕒 Llama 3 request timed out');
       } else {
-        console.error('Llama 3 request failed:', error);
+        logService.error('llama3RequestFailed', { 
+          error: error instanceof Error ? error.message : String(error) 
+        }, 'Llama 3 request failed');
       }
       this.llama3Available = false;
       return null;
@@ -559,7 +564,9 @@ Respond with: ACTION CONFIDENCE REASONING`;
         try {
           await nextRequest();
         } catch (error) {
-          console.error('Queued Llama 3 request failed:', error);
+          logService.error('queuedLlama3RequestFailed', { 
+            error: error instanceof Error ? error.message : String(error) 
+          }, 'Queued Llama 3 request failed');
         }
       }
     }
