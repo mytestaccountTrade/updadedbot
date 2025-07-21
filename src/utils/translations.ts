@@ -191,6 +191,7 @@ export const translations = {
     portfolioStatus: 'Portfolio Status: {positions} positions, ${totalValue} total value, ${totalPnl} P&L',
     tradingSignalGenerated: 'Trading signal: {action} {symbol} (confidence: {confidence})',
     tradingLoopError: 'Trading loop error',
+    aggressiveTradeExecuted: 'Aggressive trade: {action} {symbol} ({positions}/{maxPositions} positions, {profitTarget} target)',
   },
   tr: {
     // Header
@@ -384,11 +385,7 @@ export const translations = {
     portfolioStatus: 'Portföy Durumu: {positions} pozisyon, ${totalValue} toplam değer, ${totalPnl} K/Z',
     tradingSignalGenerated: 'Ticaret sinyali: {action} {symbol} (güven: {confidence})',
     tradingLoopError: 'Ticaret döngüsü hatası',
-    
-    // Aggressive mode
-    aggressiveLowVolume: 'Agresif mod: Düşük hacim {volumeRatio}x < 1.2x eşiği',
-    aggressiveTrendConflict: 'Agresif mod: EMA trendi {action} eylemiyle çelişiyor',
-    aggressiveEntryValidated: 'Agresif mod: EMA trendi ve hacimle giriş doğrulandı',
+    aggressiveTradeExecuted: 'Agresif ticaret: {action} {symbol} ({positions}/{maxPositions} pozisyon, {profitTarget} hedef)',
   },
 };
 

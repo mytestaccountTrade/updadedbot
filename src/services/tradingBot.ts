@@ -994,6 +994,17 @@ class TradingBot {
       trailingSL: exitLevels.sl
     });
     
+    // Log aggressive mode details if enabled
+    if (this.config.enableAggressiveMode) {
+      logService.info('aggressiveTradeExecuted', {
+        symbol,
+        action: trade.side,
+        positions: this.portfolio.positions.length,
+        maxPositions: 40,
+        profitTarget: '1-2%'
+      }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
+    }
+    
     // Record trade for learning
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
@@ -1053,7 +1064,7 @@ class TradingBot {
     
     // Low volume validation
     if (volumeRatio < 0.5) {
-      return { valid: false, reason: this.config.enableAggressiveMode ? 'AGGRESSIVE_LOW_VOLUME' : 'LOW_VOLUME' };
+      return { valid: false, reason: 'LOW_VOLUME' };
     }
     
     // Market condition validation
