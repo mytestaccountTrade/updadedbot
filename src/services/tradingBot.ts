@@ -920,7 +920,9 @@ class TradingBot {
     
     const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
     const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
-    const quantity = riskAmount / marketData.price;
+    const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
+    const quantity = (riskAmount * riskMultiplier) / marketData.price;
+
     
     if (quantity * marketData.price > this.portfolio.availableBalance) {
       console.log(`⚠️ Insufficient balance for ${symbol}: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
