@@ -615,7 +615,7 @@ class AdaptiveStrategyService {
   }
 
   resetLearning() {
-    console.log('🔄 Resetting adaptive strategy learning...');
+    logService.info('adaptiveStrategyReset', {}, 'Resetting adaptive strategy learning');
     
     // Reset learned patterns
     this.learnedPatterns = [];
@@ -639,8 +639,11 @@ class AdaptiveStrategyService {
     // Save reset state
     this.saveStoredData();
     
-    console.log('✅ Adaptive strategy learning reset complete');
+    logService.info('adaptiveStrategyResetComplete', {}, 'Adaptive strategy learning reset complete');
   }
 }
+
+// Import logService at the top of the file
+import { logService } from './logService';
 
 export const adaptiveStrategy = new AdaptiveStrategyService();

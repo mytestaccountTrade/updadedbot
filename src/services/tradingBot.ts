@@ -1145,7 +1145,7 @@ class TradingBot {
   }
 
   resetAILearning() {
-    console.log('🔄 Resetting AI learning across all services...');
+    logService.info('aiLearningReset', {}, 'Resetting AI learning across all services');
     
     // Reset adaptive strategy learning
     adaptiveStrategy.resetLearning();
@@ -1164,13 +1164,13 @@ class TradingBot {
     this.lastFastLearningTrade = 0;
     this.fastLearningRetrainCounter = 0;
     
-    console.log('✅ Complete AI learning reset finished');
+    logService.info('aiLearningResetComplete', {}, 'Complete AI learning reset finished');
     
     return true;
   }
 
   resetAllBotData() {
-    console.log('🔄 Resetting ALL bot data (AI learning + trade history + statistics)...');
+    logService.info('allBotDataReset', {}, 'Resetting ALL bot data (AI learning + trade history + statistics)');
     
     // Reset AI learning first
     this.resetAILearning();
@@ -1206,7 +1206,7 @@ class TradingBot {
     localStorage.removeItem('multi-strategy-performance');
     localStorage.removeItem('position-scaling-data');
     
-    console.log('✅ Complete bot data reset finished - all history and statistics cleared');
+    logService.info('allBotDataResetComplete', {}, 'Complete bot data reset finished - all history and statistics cleared');
     
     return true;
   }
