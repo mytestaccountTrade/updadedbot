@@ -61,36 +61,29 @@ class TradingBot {
           llama3Url: savedConfig.llama3Url || 'http://localhost:11434',
           llama3Model: savedConfig.llama3Model || 'llama3',
           // Multi-strategy settings
+          enableMultiStrategy: savedConfig.enableMultiStrategy !== undefined ? savedConfig.enableMultiStrategy : false,
           strategies: {
             rsiMacd: {
               enabled: savedConfig.strategies?.rsiMacd?.enabled !== undefined ? savedConfig.strategies.rsiMacd.enabled : true,
-              weight: 1.0
+              weight: savedConfig.strategies?.rsiMacd?.weight || 1.0
             },
             newsSentiment: {
-              enabled: true,
-              weight: 1.0
+              enabled: savedConfig.strategies?.newsSentiment?.enabled !== undefined ? savedConfig.strategies.newsSentiment.enabled : true,
+              weight: savedConfig.strategies?.newsSentiment?.weight || 1.0
             },
             volumeSpike: {
-              enabled: true,
-              weight: 1.0
+              enabled: savedConfig.strategies?.volumeSpike?.enabled !== undefined ? savedConfig.strategies.volumeSpike.enabled : true,
+              weight: savedConfig.strategies?.volumeSpike?.weight || 1.0
             }
           },
           // Auto-rebalance settings
-          autoRebalance: {
-            enabled: false,
-            scaleInEnabled: false,
-            scaleOutEnabled: false,
-            trailingStopEnabled: false,
-            scaleInThreshold: 2.0,
-            scaleOutThreshold: -1.5,
-            trailingStopPercent: 2.0,
-            maxScaleIns: 3,
-            maxScaleOuts: 3
-          },
+          enableAutoRebalance: savedConfig.enableAutoRebalance !== undefined ? savedConfig.enableAutoRebalance : false,
+          scaleInThreshold: savedConfig.scaleInThreshold || 0.03,
+          scaleOutThreshold: savedConfig.scaleOutThreshold || -0.01,
+          enableTrailingStop: savedConfig.enableTrailingStop !== undefined ? savedConfig.enableTrailingStop : false,
+          trailingStopPercent: savedConfig.trailingStopPercent || 0.01,
           // Simulation replay settings
-          simulationReplay: {
-            enabled: false
-          }
+          enableSimulationReplay: savedConfig.enableSimulationReplay !== undefined ? savedConfig.enableSimulationReplay : false
         };
         return config;
       }
@@ -117,6 +110,7 @@ class TradingBot {
       llama3Url: 'http://localhost:11434',
       llama3Model: 'llama3',
       // Multi-strategy settings
+      enableMultiStrategy: false,
       strategies: {
         rsiMacd: {
           enabled: true,
@@ -132,21 +126,13 @@ class TradingBot {
         }
       },
       // Auto-rebalance settings
-      autoRebalance: {
-        enabled: false,
-        scaleInEnabled: false,
-        scaleOutEnabled: false,
-        trailingStopEnabled: false,
-        scaleInThreshold: 2.0,
-        scaleOutThreshold: -1.5,
-        trailingStopPercent: 2.0,
-        maxScaleIns: 3,
-        maxScaleOuts: 3
-      },
+      enableAutoRebalance: false,
+      scaleInThreshold: 0.03,
+      scaleOutThreshold: -0.01,
+      enableTrailingStop: false,
+      trailingStopPercent: 0.01,
       // Simulation replay settings
-      simulationReplay: {
-        enabled: false
-      }
+      enableSimulationReplay: false
     };
   }
 

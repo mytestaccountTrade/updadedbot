@@ -80,10 +80,10 @@ export interface BotConfig {
   };
   // Auto-Rebalance Settings
   enableAutoRebalance: boolean;
-  scaleInThreshold: number; // Profit % to trigger scale in
-  scaleOutThreshold: number; // Loss % to trigger scale out
+  scaleInThreshold: number; // Decimal format: 0.03 = 3%
+  scaleOutThreshold: number; // Decimal format: -0.01 = -1%
   enableTrailingStop: boolean;
-  trailingStopPercent: number;
+  trailingStopPercent: number; // Decimal format: 0.01 = 1%
   // Simulation Replay Settings
   enableSimulationReplay: boolean;
 }

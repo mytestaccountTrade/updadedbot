@@ -523,38 +523,38 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               <div className="space-y-4 mt-4 pt-4 border-t border-gray-200">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('scaleInThreshold')} ({(formData.scaleInThreshold * 100).toFixed(1)}%)
+                    {t('scaleInThreshold')} ({((formData.scaleInThreshold || 0.03) * 100).toFixed(1)}%)
                   </label>
                   <input
                     type="range"
-                    min="0.01"
-                    max="0.1"
+                    min="0.005"
+                    max="0.05"
                     step="0.001"
-                    value={formData.scaleInThreshold}
+                    value={formData.scaleInThreshold || 0.03}
                     onChange={(e) => handleChange('scaleInThreshold', parseFloat(e.target.value))}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>1%</span>
-                    <span>10%</span>
+                    <span>0.5%</span>
+                    <span>5%</span>
                   </div>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('scaleOutThreshold')} ({(Math.abs(formData.scaleOutThreshold) * 100).toFixed(1)}%)
+                    {t('scaleOutThreshold')} ({(Math.abs(formData.scaleOutThreshold || -0.01) * 100).toFixed(1)}%)
                   </label>
                   <input
                     type="range"
-                    min="-0.05"
+                    min="-0.03"
                     max="-0.005"
                     step="0.001"
-                    value={formData.scaleOutThreshold}
+                    value={formData.scaleOutThreshold || -0.01}
                     onChange={(e) => handleChange('scaleOutThreshold', parseFloat(e.target.value))}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>-5%</span>
+                    <span>-3%</span>
                     <span>-0.5%</span>
                   </div>
                 </div>
@@ -589,20 +589,20 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('trailingStopPercent')} ({(formData.trailingStopPercent * 100).toFixed(1)}%)
+                    {t('trailingStopPercent')} ({((formData.trailingStopPercent || 0.01) * 100).toFixed(1)}%)
                   </label>
                   <input
                     type="range"
                     min="0.005"
-                    max="0.05"
+                    max="0.03"
                     step="0.001"
-                    value={formData.trailingStopPercent}
+                    value={formData.trailingStopPercent || 0.01}
                     onChange={(e) => handleChange('trailingStopPercent', parseFloat(e.target.value))}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
                     <span>0.5%</span>
-                    <span>5%</span>
+                    <span>3%</span>
                   </div>
                 </div>
               </div>
