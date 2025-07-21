@@ -140,7 +140,7 @@ class TradingBot {
       localStorage.setItem('trading-bot-config', JSON.stringify(this.config));
       logService.info('configSaved');
     } catch (error) {
-      logService.error('configSaveError', { error: error instanceof Error ? error.message : String(error) }, 'Failed to save config');
+      logService.error('configSaveError', { error: error.message }, 'Failed to save config');
     }
   }
 
