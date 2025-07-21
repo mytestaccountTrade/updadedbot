@@ -64,19 +64,35 @@ class TradingBot {
           strategies: {
             rsiMacd: {
               enabled: savedConfig.strategies?.rsiMacd?.enabled !== undefined ? savedConfig.strategies.rsiMacd.enabled : true,
-          enableAutoRebalance: false,
-          scaleInThreshold: 0.02,
-          scaleOutThreshold: -0.015,
-          enableTrailingStop: false,
-          trailingStopPercent: 0.02,
+              weight: 1.0
+            },
+            newsSentiment: {
+              enabled: true,
+              weight: 1.0
+            },
+            volumeSpike: {
+              enabled: true,
+              weight: 1.0
+            }
+          },
           // Auto-rebalance settings
-          enableAutoRebalance: savedConfig.enableAutoRebalance !== undefined ? savedConfig.enableAutoRebalance : false,
-          scaleInThreshold: savedConfig.scaleInThreshold || 0.02,
-          scaleOutThreshold: savedConfig.scaleOutThreshold || -0.015,
-          enableTrailingStop: savedConfig.enableTrailingStop !== undefined ? savedConfig.enableTrailingStop : false,
-          trailingStopPercent: savedConfig.trailingStopPercent || 0.02,
+          autoRebalance: {
+            enabled: false,
+            scaleInEnabled: false,
+            scaleOutEnabled: false,
+            trailingStopEnabled: false,
+            scaleInThreshold: 2.0,
+            scaleOutThreshold: -1.5,
+            trailingStopPercent: 2.0,
+            maxScaleIns: 3,
+            maxScaleOuts: 3
+          },
           // Simulation replay settings
-          enableSimulationReplay: false
+          simulationReplay: {
+            enabled: false
+          }
+        };
+        return config;
       }
     } catch (error) {
       console.error('Failed to load saved config:', error);
