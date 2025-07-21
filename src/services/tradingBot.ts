@@ -79,7 +79,7 @@ class TradingBot {
           enableTrailingStop: savedConfig.enableTrailingStop !== undefined ? savedConfig.enableTrailingStop : false,
           trailingStopPercent: savedConfig.trailingStopPercent || 0.01,
           // Simulation replay settings
-          enableSimulationReplay: savedConfig.enableSimulationReplay !== undefined ? savedConfig.enableSimulationReplay : false
+         enableSimulationReplay: savedConfig.enableSimulationReplay !== undefined ? savedConfig.enableSimulationReplay : false,
           // Aggressive mode settings
           enableAggressiveMode: savedConfig.enableAggressiveMode !== undefined ? savedConfig.enableAggressiveMode : false
         };
