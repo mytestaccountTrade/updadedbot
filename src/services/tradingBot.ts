@@ -636,16 +636,12 @@ class TradingBot {
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
     
-    logService.info('updatingPositions', {
-      count: this.portfolio.positions.length
-    });
+    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
     
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
       if (!marketData) {
-        logService.warning('noMarketDataForPosition', {
-          symbol: position.symbol
-        });
+        console.log(`⚠️ No market data for position ${position.symbol}`);
         continue;
       }
       
@@ -660,10 +656,7 @@ class TradingBot {
       // Priority 1: Check multi-exit levels (highest priority)
       const exitResult = this.checkMultiExitLevels(position, marketData.price);
       if (exitResult.shouldExit) {
-        logService.trade('multiExitTriggered', {
-          symbol: position.symbol,
-          reason: exitResult.reason
-        });
+        console.log(`🎯 Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
         await this.closePositionInternal(position, exitResult.reason);
         continue;
       }
@@ -671,10 +664,7 @@ class TradingBot {
       // Priority 2: Market regime-based exits
       const regimeExit = this.checkMarketRegimeExit(position, marketData, marketCondition, strategy);
       if (regimeExit.shouldExit) {
-        logService.trade('marketRegimeExit', {
-          symbol: position.symbol,
-          reason: regimeExit.reason
-        });
+        console.log(`📊 Market regime exit for ${position.symbol}: ${regimeExit.reason}`);
         await this.closePositionInternal(position, regimeExit.reason);
         continue;
       }
@@ -682,10 +672,7 @@ class TradingBot {
       // Priority 3: Time-based and learning exits
       const timeBasedExit = this.checkTimeBasedExit(position, marketData);
       if (timeBasedExit.shouldExit) {
-        logService.trade('timeBasedExit', {
-          symbol: position.symbol,
-          reason: timeBasedExit.reason
-        });
+        console.log(`⏰ Time-based exit for ${position.symbol}: ${timeBasedExit.reason}`);
         await this.closePositionInternal(position, timeBasedExit.reason);
         continue;
       }
@@ -693,10 +680,7 @@ class TradingBot {
       // Priority 4: Traditional stop-loss and take-profit (fallback)
       const traditionalExit = this.checkTraditionalExit(position, marketData);
       if (traditionalExit.shouldExit) {
-        logService.trade('traditionalExit', {
-          symbol: position.symbol,
-          reason: traditionalExit.reason
-        });
+        console.log(`🛑 Traditional exit for ${position.symbol}: ${traditionalExit.reason}`);
         await this.closePositionInternal(position, traditionalExit.reason);
         continue;
       }
@@ -800,11 +784,11 @@ class TradingBot {
     const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
     const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
       
-    // Check stop loss
+      // Check stop loss
     if (position.pnlPercent <= adaptiveStopLoss) {
       return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
     }
-    // Check take profit
+      // Check take profit
     if (position.pnlPercent >= adaptiveTakeProfit) {
       return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
     }
@@ -896,10 +880,7 @@ class TradingBot {
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
-      logService.warning('entryBlocked', {
-        symbol: symbol,
-        reason: 'Already have position'
-      });
+      console.log(`⚠️ Skipping ${symbol} - already have position`);
       return;
     }
     
