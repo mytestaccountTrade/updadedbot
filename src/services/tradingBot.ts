@@ -510,9 +510,7 @@ class TradingBot {
       if (this.fastLearningTradeCount === 0 || (this.fastLearningTradeCount % 10 === 0 && tradingPairs.length > 0)) {
         const randomPair = tradingPairs[Math.floor(Math.random() * Math.min(5, tradingPairs.length))];
         if (!this.activePositionIds.has(randomPair.symbol) && this.portfolio.positions.length < this.config.maxPositions) {
-          logService.learning('forcedExplorationTrade', {
-            symbol: randomPair.symbol
-          });
+          console.log(`🎯 Forced exploration trade on ${randomPair.symbol}`);
           
           const basicMarketData = {
             symbol: randomPair.symbol,
