@@ -510,9 +510,7 @@ class TradingBot {
       if (this.fastLearningTradeCount === 0 || (this.fastLearningTradeCount % 10 === 0 && tradingPairs.length > 0)) {
         const randomPair = tradingPairs[Math.floor(Math.random() * Math.min(5, tradingPairs.length))];
         if (!this.activePositionIds.has(randomPair.symbol) && this.portfolio.positions.length < this.config.maxPositions) {
-          logService.learning('forcedExplorationTrade', {
-            symbol: randomPair.symbol
-          });
+          console.log(`🎯 Forced exploration trade on ${randomPair.symbol}`);
           
           const basicMarketData = {
             symbol: randomPair.symbol,
@@ -559,11 +557,7 @@ class TradingBot {
       // Update existing positions
       await this.updatePositions();
       
-      logService.info('portfolioStatus', {
-        positions: this.portfolio.positions.length,
-        totalValue: this.portfolio.totalValue.toFixed(2),
-        totalPnl: this.portfolio.totalPnl.toFixed(2)
-      });
+      console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
       
       // Process trading pairs in batches to prevent resource overload
       const batchSize = 3;
@@ -605,14 +599,11 @@ class TradingBot {
           };
           
           // Log confidence threshold for debugging
-          logService.info('tradingSignalGenerated', {
-            action: finalSignal.action,
-            symbol: pair.symbol,
-            confidence: finalSignal.confidence.toFixed(2)
-          });
+          console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
           
           // More aggressive entry - lower confidence threshold
           if (finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold) {
+            console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
         }));
@@ -636,16 +627,12 @@ class TradingBot {
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
     
-    logService.info('updatingPositions', {
-      count: this.portfolio.positions.length
-    });
+    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
     
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
       if (!marketData) {
-        logService.warning('noMarketDataForPosition', {
-          symbol: position.symbol
-        });
+        console.log(`⚠️ No market data for position ${position.symbol}`);
         continue;
       }
       
@@ -660,10 +647,7 @@ class TradingBot {
       // Priority 1: Check multi-exit levels (highest priority)
       const exitResult = this.checkMultiExitLevels(position, marketData.price);
       if (exitResult.shouldExit) {
-        logService.trade('multiExitTriggered', {
-          symbol: position.symbol,
-          reason: exitResult.reason
-        });
+        console.log(`🎯 Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
         await this.closePositionInternal(position, exitResult.reason);
         continue;
       }
@@ -671,10 +655,7 @@ class TradingBot {
       // Priority 2: Market regime-based exits
       const regimeExit = this.checkMarketRegimeExit(position, marketData, marketCondition, strategy);
       if (regimeExit.shouldExit) {
-        logService.trade('marketRegimeExit', {
-          symbol: position.symbol,
-          reason: regimeExit.reason
-        });
+        console.log(`📊 Market regime exit for ${position.symbol}: ${regimeExit.reason}`);
         await this.closePositionInternal(position, regimeExit.reason);
         continue;
       }
@@ -682,10 +663,7 @@ class TradingBot {
       // Priority 3: Time-based and learning exits
       const timeBasedExit = this.checkTimeBasedExit(position, marketData);
       if (timeBasedExit.shouldExit) {
-        logService.trade('timeBasedExit', {
-          symbol: position.symbol,
-          reason: timeBasedExit.reason
-        });
+        console.log(`⏰ Time-based exit for ${position.symbol}: ${timeBasedExit.reason}`);
         await this.closePositionInternal(position, timeBasedExit.reason);
         continue;
       }
@@ -693,10 +671,7 @@ class TradingBot {
       // Priority 4: Traditional stop-loss and take-profit (fallback)
       const traditionalExit = this.checkTraditionalExit(position, marketData);
       if (traditionalExit.shouldExit) {
-        logService.trade('traditionalExit', {
-          symbol: position.symbol,
-          reason: traditionalExit.reason
-        });
+        console.log(`🛑 Traditional exit for ${position.symbol}: ${traditionalExit.reason}`);
         await this.closePositionInternal(position, traditionalExit.reason);
         continue;
       }
@@ -800,14 +775,14 @@ class TradingBot {
     const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
     const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
       
-    // Check stop loss
+      // Check stop loss
     if (position.pnlPercent <= adaptiveStopLoss) {
       return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
-    }
-    // Check take profit
+      }
+      // Check take profit
     if (position.pnlPercent >= adaptiveTakeProfit) {
       return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
-    }
+      }
     
     return { shouldExit: false, reason: '' };
   }
