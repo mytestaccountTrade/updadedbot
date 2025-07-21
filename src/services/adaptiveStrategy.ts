@@ -647,6 +647,7 @@ class AdaptiveStrategyService {
   }
 
   private loadStoredDataInternal() {
+  }
 }
 
 // Import logService at the top of the file
