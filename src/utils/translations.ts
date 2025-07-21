@@ -139,6 +139,40 @@ export const translations = {
     
     // Volume
     volume: 'Vol',
+    
+    // Log Panel
+    botLogs: 'Bot Logs',
+    clearLogs: 'Clear Logs',
+    searchLogs: 'Search logs...',
+    all: 'All',
+    info: 'Info',
+    trade: 'Trade',
+    learning: 'Learning',
+    warning: 'Warning',
+    error: 'Error',
+    noLogsMatchFilter: 'No logs match the current filter',
+    noLogsYet: 'No logs yet',
+    totalLogs: 'Total logs',
+    showing: 'Showing',
+    
+    // Log Messages
+    botStarted: 'Trading bot started in {mode} mode',
+    botStopped: 'Trading bot stopped',
+    tradeExecuted: '{action} {quantity} {symbol} at ${price}',
+    positionClosed: 'Position closed: {symbol} P&L: ${pnl} ({reason})',
+    signalGenerated: '{action} signal for {symbol} (confidence: {confidence})',
+    adaptiveDecision: 'Adaptive strategy: {decision} - {reason}',
+    learningUpdate: 'AI learning updated: {patterns} patterns learned',
+    riskAdjustment: 'Risk level adjusted to {level}% due to {reason}',
+    tradeBlocked: 'Trade blocked: {symbol} - {reason}',
+    fastLearningTrade: 'Fast learning trade: {action} {symbol}',
+    patternLearned: 'New profitable pattern learned: {description}',
+    cooldownActivated: 'Trading paused for {duration} after consecutive losses',
+    websocketConnected: 'WebSocket connected for {symbol}',
+    websocketDisconnected: 'WebSocket disconnected for {symbol}',
+    configLoaded: 'Bot configuration loaded',
+    configSaved: 'Bot configuration saved',
+    portfolioUpdated: 'Portfolio updated: ${value} total value',
   },
   tr: {
     // Header
@@ -280,6 +314,40 @@ export const translations = {
     
     // Volume
     volume: 'Hacim',
+    
+    // Log Panel
+    botLogs: 'Bot Günlükleri',
+    clearLogs: 'Günlükleri Temizle',
+    searchLogs: 'Günlüklerde ara...',
+    all: 'Tümü',
+    info: 'Bilgi',
+    trade: 'İşlem',
+    learning: 'Öğrenme',
+    warning: 'Uyarı',
+    error: 'Hata',
+    noLogsMatchFilter: 'Mevcut filtreye uygun günlük yok',
+    noLogsYet: 'Henüz günlük yok',
+    totalLogs: 'Toplam günlük',
+    showing: 'Gösterilen',
+    
+    // Log Messages
+    botStarted: 'Ticaret botu {mode} modunda başlatıldı',
+    botStopped: 'Ticaret botu durduruldu',
+    tradeExecuted: '{action} {quantity} {symbol} ${price} fiyatından',
+    positionClosed: 'Pozisyon kapatıldı: {symbol} K/Z: ${pnl} ({reason})',
+    signalGenerated: '{symbol} için {action} sinyali (güven: {confidence})',
+    adaptiveDecision: 'Uyarlanabilir strateji: {decision} - {reason}',
+    learningUpdate: 'AI öğrenme güncellendi: {patterns} kalıp öğrenildi',
+    riskAdjustment: 'Risk seviyesi {reason} nedeniyle {level}% olarak ayarlandı',
+    tradeBlocked: 'İşlem engellendi: {symbol} - {reason}',
+    fastLearningTrade: 'Hızlı öğrenme işlemi: {action} {symbol}',
+    patternLearned: 'Yeni karlı kalıp öğrenildi: {description}',
+    cooldownActivated: 'Ardışık kayıplar sonrası {duration} süreyle işlem durduruldu',
+    websocketConnected: '{symbol} için WebSocket bağlandı',
+    websocketDisconnected: '{symbol} için WebSocket bağlantısı kesildi',
+    configLoaded: 'Bot yapılandırması yüklendi',
+    configSaved: 'Bot yapılandırması kaydedildi',
+    portfolioUpdated: 'Portföy güncellendi: ${value} toplam değer',
   },
 };
 

@@ -5,6 +5,7 @@ import { learningService } from './learningService';
 import { adaptiveStrategy } from './adaptiveStrategy';
 import { multiStrategyService } from './multiStrategyService';
 import { positionScalingService } from './positionScalingService';
+import { logService } from './logService';
 
 class TradingBot {
   private config: BotConfig;
@@ -41,7 +42,7 @@ class TradingBot {
       const saved = localStorage.getItem('trading-bot-config');
       if (saved) {
         const savedConfig = JSON.parse(saved);
-        console.log('📁 Loaded saved bot configuration');
+        logService.info('configLoaded', {}, 'Loaded saved bot configuration');
         
         // Merge with defaults to ensure all fields exist
         const config = {
@@ -88,11 +89,11 @@ class TradingBot {
         return config;
       }
     } catch (error) {
-      console.error('Failed to load saved config:', error);
+      logService.error('configLoadError', { error: error.message }, 'Failed to load saved config');
     }
     
     // Return default config
-    console.log('📁 Using default bot configuration');
+    logService.info('configLoaded', {}, 'Using default bot configuration');
     return {
       mode: 'SIMULATION',
       simulationBalance: 10000,
@@ -139,9 +140,9 @@ class TradingBot {
   private saveConfig(): void {
     try {
       localStorage.setItem('trading-bot-config', JSON.stringify(this.config));
-      console.log('💾 Bot configuration saved');
+      logService.info('configSaved');
     } catch (error) {
-      console.error('Failed to save config:', error);
+      logService.error('configSaveError', { error: error.message }, 'Failed to save config');
     }
   }
 

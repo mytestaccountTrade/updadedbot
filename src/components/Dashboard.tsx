@@ -10,9 +10,11 @@ import { NewsPanel } from './NewsPanel';
 import { PositionsTable } from './PositionsTable';
 import { TradesHistory } from './TradesHistory';
 import { BotSettings } from './BotSettings';
+import { LogPanel } from './LogPanel';
 import { useLanguage } from '../contexts/LanguageContext';
 import { learningService } from '../services/learningService';
 import { adaptiveStrategy } from '../services/adaptiveStrategy';
+import { logService } from '../services/logService';
 
 export const Dashboard: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -23,7 +25,7 @@ export const Dashboard: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [learningStats, setLearningStats] = useState<any>(null);
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news' | 'logs'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export const Dashboard: React.FC = () => {
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
     
     // Initialize bot with saved settings
-    console.log('🚀 Dashboard initialized with saved bot configuration');
+    logService.info('configLoaded', {}, 'Dashboard initialized with saved bot configuration');
     
     return () => {
       clearInterval(interval);
@@ -82,8 +84,10 @@ export const Dashboard: React.FC = () => {
   const handleStartStop = () => {
     if (isRunning) {
       tradingBot.stop();
+      logService.info('botStopped');
     } else {
       tradingBot.start();
+      logService.info('botStarted', { mode: config.mode });
     }
     setIsRunning(!isRunning);
   };
@@ -234,6 +238,7 @@ export const Dashboard: React.FC = () => {
                 { id: 'positions', label: t('positions') },
                 { id: 'trades', label: t('trades') },
                 { id: 'news', label: t('news') },
+                { id: 'logs', label: t('botLogs') },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -338,6 +343,12 @@ export const Dashboard: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('cryptoNewsAnalysis')}</h3>
                 <NewsPanel news={news} />
+              </div>
+            )}
+            
+            {activeTab === 'logs' && (
+              <div>
+                <LogPanel />
               </div>
             )}
             
