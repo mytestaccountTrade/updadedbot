@@ -25,7 +25,7 @@ export const Dashboard: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [learningStats, setLearningStats] = useState<any>(null);
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news' | 'logs'| 'replay'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   useEffect(() => {
