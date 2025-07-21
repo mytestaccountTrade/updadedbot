@@ -3,6 +3,8 @@ import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
 import { adaptiveStrategy } from './adaptiveStrategy';
+import { multiStrategyService } from './multiStrategyService';
+import { positionScalingService } from './positionScalingService';
 
 class TradingBot {
   private config: BotConfig;

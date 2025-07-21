@@ -71,6 +71,21 @@ export interface BotConfig {
   apiSecret?: string;
   llama3Url?: string;
   llama3Model?: string;
+  // Multi-Strategy Settings
+  enableMultiStrategy: boolean;
+  strategies: {
+    rsiMacd: { enabled: boolean; weight: number };
+    newsSentiment: { enabled: boolean; weight: number };
+    volumeSpike: { enabled: boolean; weight: number };
+  };
+  // Auto-Rebalance Settings
+  enableAutoRebalance: boolean;
+  scaleInThreshold: number; // Profit % to trigger scale in
+  scaleOutThreshold: number; // Loss % to trigger scale out
+  enableTrailingStop: boolean;
+  trailingStopPercent: number;
+  // Simulation Replay Settings
+  enableSimulationReplay: boolean;
 }
 
 export interface AppSettings {
@@ -101,4 +116,41 @@ export interface TradingSignal {
   sentimentScore: number;
   marketData: MarketData;
   newsContext: NewsItem[];
+}
+
+export interface StrategyResult {
+  strategyName: string;
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  reasoning: string;
+  weight: number;
+}
+
+export interface StrategyPerformance {
+  name: string;
+  totalTrades: number;
+  winningTrades: number;
+  totalPnL: number;
+  winRate: number;
+  avgTradeDuration: number;
+  lastUsed: number;
+}
+
+export interface PositionScaling {
+  positionId: string;
+  originalSize: number;
+  currentSize: number;
+  scaleInCount: number;
+  scaleOutCount: number;
+  trailingStopPrice?: number;
+  highWaterMark: number;
+}
+
+export interface SimulationReplay {
+  date: string;
+  marketData: MarketData[];
+  newsData: NewsItem[];
+  strategies: StrategyPerformance[];
+  totalPnL: number;
+  totalTrades: number;
 }
