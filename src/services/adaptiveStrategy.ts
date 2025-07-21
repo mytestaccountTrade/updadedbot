@@ -63,7 +63,7 @@ class AdaptiveStrategyService {
 
   constructor() {
     this.initializeStrategies();
-    this.loadStoredData();
+    this.loadStoredDataInternal();
   }
 
   private initializeStrategies() {
@@ -594,7 +594,7 @@ class AdaptiveStrategyService {
     }
   }
 
-  private loadStoredData() {
+  private loadStoredDataInternal() {
     try {
       const patterns = localStorage.getItem('adaptive-strategy-patterns');
       if (patterns) this.learnedPatterns = JSON.parse(patterns);
@@ -641,6 +641,12 @@ class AdaptiveStrategyService {
     
     logService.learning('adaptiveStrategyResetComplete', {}, 'Adaptive strategy learning reset complete');
   }
+
+  loadStoredData() {
+    this.loadStoredDataInternal();
+  }
+
+  private loadStoredDataInternal() {
 }
 
 // Import logService at the top of the file
