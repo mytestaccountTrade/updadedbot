@@ -586,7 +586,8 @@ class TradingBot {
         // Process batch in parallel but with limited concurrency
         await Promise.all(batch.map(async (pair) => {
           // Skip if we already have a position in this symbol
-          if (this.activePositionIds.has(pair.symbol)) return;
+          if (!this.config.enableAggressiveMode && this.activePositionIds.has(pair.symbol)) return;
+
           
           const marketData = await binanceService.getMarketData(pair.symbol);
           if (!marketData) return;
