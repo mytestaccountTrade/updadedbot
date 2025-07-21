@@ -605,14 +605,11 @@ class TradingBot {
           };
           
           // Log confidence threshold for debugging
-          logService.info('tradingSignalGenerated', {
-            action: finalSignal.action,
-            symbol: pair.symbol,
-            confidence: finalSignal.confidence.toFixed(2)
-          });
+          console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
           
           // More aggressive entry - lower confidence threshold
           if (finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold) {
+            console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
         }));
@@ -784,11 +781,11 @@ class TradingBot {
     const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
     const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
       
-      // Check stop loss
+    // Check stop loss
     if (position.pnlPercent <= adaptiveStopLoss) {
       return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
     }
-      // Check take profit
+    // Check take profit
     if (position.pnlPercent >= adaptiveTakeProfit) {
       return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
     }
