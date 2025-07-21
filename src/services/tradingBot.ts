@@ -31,8 +31,6 @@ class TradingBot {
       trades: [],
     };
 
-    // Load adaptive strategy setting from localStorage
-  }
 
   private loadConfig(): BotConfig {
     try {
@@ -87,7 +85,7 @@ class TradingBot {
       }
     } catch (error) {
       logService.error('configLoadError', { 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? error.message : String(error)
       }, 'Failed to load saved config');
     }
     
@@ -142,7 +140,7 @@ class TradingBot {
       logService.info('configSaved');
     } catch (error) {
       logService.error('configSaveError', { 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? error.message : String(error)
       }, 'Failed to save config');
     }
   }
@@ -338,10 +336,18 @@ class TradingBot {
           confidence: adaptiveDecision.confidence.toFixed(3),
           threshold: this.config.confidenceThreshold.toFixed(3)
         });
+          decision: adaptiveDecision.shouldTrade ? 'ALLOW' : 'BLOCK',
+          reason: adaptiveDecision.reason,
+          confidence: adaptiveDecision.confidence.toFixed(3),
+          threshold: this.config.confidenceThreshold.toFixed(3)
+        });
       }
       
       if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
         logService.warning('tradeBlocked', {
+          symbol: marketData.symbol,
+          reason: adaptiveDecision.reason
+        });
           symbol: marketData.symbol,
           reason: adaptiveDecision.reason
         });
@@ -362,6 +368,11 @@ class TradingBot {
         confidence: enhancedSignal.confidence.toFixed(3),
         threshold: this.config.confidenceThreshold.toFixed(3)
       });
+        symbol: marketData.symbol,
+        action: enhancedSignal.action,
+        confidence: enhancedSignal.confidence.toFixed(3),
+        threshold: this.config.confidenceThreshold.toFixed(3)
+      });
       
       // Fast learning trading logic
       const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
@@ -377,8 +388,15 @@ class TradingBot {
             action,
             symbol: marketData.symbol
           });
+            action,
+            symbol: marketData.symbol
+          });
         }
         
+        logService.learning('fastLearningTradeExecuted', {
+          action,
+          symbol: marketData.symbol,
+          confidence: enhancedSignal.confidence.toFixed(2)
         logService.learning('fastLearningTradeExecuted', {
           action,
           symbol: marketData.symbol,
@@ -395,11 +413,17 @@ class TradingBot {
           totalValue: this.portfolio.totalValue.toFixed(2),
           totalPnl: this.portfolio.totalPnl.toFixed(2)
         });
+          positions: this.portfolio.positions.length,
+          totalValue: this.portfolio.totalValue.toFixed(2),
+          totalPnl: this.portfolio.totalPnl.toFixed(2)
+        });
         
         // Trigger learning every 3-5 trades (randomized)
         const retrainInterval = 3 + Math.floor(Math.random() * 3); // 3-5 trades
         if (this.fastLearningTradeCount % retrainInterval === 0) {
           logService.learning('earlyRetraining', {
+            tradeCount: this.fastLearningTradeCount
+          });
             tradeCount: this.fastLearningTradeCount
           });
           await learningService.retrainModel();
@@ -512,7 +536,9 @@ class TradingBot {
       if (this.fastLearningTradeCount === 0 || (this.fastLearningTradeCount % 10 === 0 && tradingPairs.length > 0)) {
         const randomPair = tradingPairs[Math.floor(Math.random() * Math.min(5, tradingPairs.length))];
         if (!this.activePositionIds.has(randomPair.symbol) && this.portfolio.positions.length < this.config.maxPositions) {
-          console.log(`🎯 Forced exploration trade on ${randomPair.symbol}`);
+          logService.learning('forcedExplorationTrade', {
+            symbol: randomPair.symbol
+          });
           
           const basicMarketData = {
             symbol: randomPair.symbol,
@@ -559,7 +585,11 @@ class TradingBot {
       // Update existing positions
       await this.updatePositions();
       
-      console.log(`📊 Portfolio Status: ${this.portfolio.positions.length} positions, $${this.portfolio.totalValue.toFixed(2)} total value, $${this.portfolio.totalPnl.toFixed(2)} P&L`);
+      logService.info('portfolioStatus', {
+        positions: this.portfolio.positions.length,
+        totalValue: this.portfolio.totalValue.toFixed(2),
+        totalPnl: this.portfolio.totalPnl.toFixed(2)
+      });
       
       // Process trading pairs in batches to prevent resource overload
       const batchSize = 3;
@@ -601,11 +631,14 @@ class TradingBot {
           };
           
           // Log confidence threshold for debugging
-          console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
+          logService.info('tradingSignalGenerated', {
+            action: finalSignal.action,
+            symbol: pair.symbol,
+            confidence: finalSignal.confidence.toFixed(2)
+          });
           
           // More aggressive entry - lower confidence threshold
           if (finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold) {
-            console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
           }
         }));
@@ -629,12 +662,16 @@ class TradingBot {
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
     
-    console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
+    logService.info('updatingPositions', {
+      count: this.portfolio.positions.length
+    });
     
     for (const position of this.portfolio.positions) {
       const marketData = await binanceService.getMarketData(position.symbol);
       if (!marketData) {
-        console.log(`⚠️ No market data for position ${position.symbol}`);
+        logService.warning('noMarketDataForPosition', {
+          symbol: position.symbol
+        });
         continue;
       }
       
@@ -649,7 +686,10 @@ class TradingBot {
       // Priority 1: Check multi-exit levels (highest priority)
       const exitResult = this.checkMultiExitLevels(position, marketData.price);
       if (exitResult.shouldExit) {
-        console.log(`🎯 Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
+        logService.trade('multiExitTriggered', {
+          symbol: position.symbol,
+          reason: exitResult.reason
+        });
         await this.closePositionInternal(position, exitResult.reason);
         continue;
       }
@@ -657,7 +697,10 @@ class TradingBot {
       // Priority 2: Market regime-based exits
       const regimeExit = this.checkMarketRegimeExit(position, marketData, marketCondition, strategy);
       if (regimeExit.shouldExit) {
-        console.log(`📊 Market regime exit for ${position.symbol}: ${regimeExit.reason}`);
+        logService.trade('marketRegimeExit', {
+          symbol: position.symbol,
+          reason: regimeExit.reason
+        });
         await this.closePositionInternal(position, regimeExit.reason);
         continue;
       }
@@ -665,7 +708,10 @@ class TradingBot {
       // Priority 3: Time-based and learning exits
       const timeBasedExit = this.checkTimeBasedExit(position, marketData);
       if (timeBasedExit.shouldExit) {
-        console.log(`⏰ Time-based exit for ${position.symbol}: ${timeBasedExit.reason}`);
+        logService.trade('timeBasedExit', {
+          symbol: position.symbol,
+          reason: timeBasedExit.reason
+        });
         await this.closePositionInternal(position, timeBasedExit.reason);
         continue;
       }
@@ -673,7 +719,10 @@ class TradingBot {
       // Priority 4: Traditional stop-loss and take-profit (fallback)
       const traditionalExit = this.checkTraditionalExit(position, marketData);
       if (traditionalExit.shouldExit) {
-        console.log(`🛑 Traditional exit for ${position.symbol}: ${traditionalExit.reason}`);
+        logService.trade('traditionalExit', {
+          symbol: position.symbol,
+          reason: traditionalExit.reason
+        });
         await this.closePositionInternal(position, traditionalExit.reason);
         continue;
       }
@@ -873,7 +922,10 @@ class TradingBot {
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
-      console.log(`⚠️ Skipping ${symbol} - already have position`);
+      logService.warning('entryBlocked', {
+        symbol: symbol,
+        reason: 'Already have position'
+      });
       return;
     }
     
@@ -897,13 +949,19 @@ class TradingBot {
     const quantity = riskAmount / marketData.price;
     
     if (quantity * marketData.price > this.portfolio.availableBalance) {
-      console.log(`⚠️ Insufficient balance for ${symbol}: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
+      logService.warning('entryBlocked', {
+        symbol: symbol,
+        reason: `Insufficient balance: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`
+      });
       return;
     }
     
     // Minimum trade validation
     if (quantity * marketData.price < 10) {
-      console.log(`⚠️ Trade too small for ${symbol}: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`);
+      logService.warning('entryBlocked', {
+        symbol: symbol,
+        reason: `Trade too small: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`
+      });
       return;
     }
     
@@ -935,7 +993,12 @@ class TradingBot {
     if (this.config.mode === 'REAL') {
       // Execute real trade via Binance API
       const realTrade = await binanceService.placeTrade(symbol, action, quantity);
-      if (!realTrade) return;
+      if (!realTrade) {
+        logService.error('realTradeExecutionFailed', {
+          symbol: symbol
+        });
+        return;
+      }
       
       trade.id = realTrade.id;
       trade.price = realTrade.price;
@@ -972,9 +1035,12 @@ class TradingBot {
     await learningService.recordTrade(trade, position, tradeContext);
     this.portfolio.availableBalance -= quantity * marketData.price;
     
-    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
-    console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
-    console.log(`   🎯 Exits: TP1=${exitLevels.tp1.toFixed(2)}, TP2=${exitLevels.tp2.toFixed(2)}, TP3=${exitLevels.tp3.toFixed(2)}, SL=${exitLevels.sl.toFixed(2)}`);
+    logService.trade('tradeExecuted', {
+      action,
+      quantity: quantity.toFixed(6),
+      symbol,
+      price: marketData.price.toFixed(2)
+    });
   }
 
   private validateTradeEntry(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, marketCondition: any, signal?: any): { valid: boolean; reason: string } {
@@ -1068,7 +1134,9 @@ class TradingBot {
         position.size
       );
       if (!realTrade) {
-        console.error(`❌ Failed to execute real trade for closing position ${position.symbol}`);
+        logService.error('realTradeExecutionFailed', {
+          symbol: position.symbol
+        });
         return false;
       }
       
@@ -1097,7 +1165,11 @@ class TradingBot {
     this.activePositionIds.delete(position.symbol);
     this.multiExitPositions.delete(position.id);
     
-    console.log(`Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
+    logService.trade('positionClosed', {
+      symbol: position.symbol,
+      pnl: position.pnl.toFixed(2),
+      reason: reason
+    });
     return true;
   }
 
@@ -1127,7 +1199,10 @@ class TradingBot {
     
     // Debug logging to help track the calculation
     if (this.portfolio.positions.length > 0) {
-      console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${positionsValue.toFixed(2)}, Invested: $${investedCapital.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
+      logService.info('portfolioDebug', {
+        available: this.portfolio.availableBalance.toFixed(2),
+        totalPnl: totalPnl.toFixed(2)
+      });
     }
   }
   
@@ -1172,7 +1247,7 @@ class TradingBot {
   }
 
   resetAILearning() {
-    logService.info('aiLearningReset', {}, 'Resetting AI learning across all services');
+    logService.learning('aiLearningReset', {}, 'Resetting AI learning across all services');
     
     // Reset adaptive strategy learning
     adaptiveStrategy.resetLearning();
@@ -1191,13 +1266,13 @@ class TradingBot {
     this.lastFastLearningTrade = 0;
     this.fastLearningRetrainCounter = 0;
     
-    logService.info('aiLearningResetComplete', {}, 'Complete AI learning reset finished');
+    logService.learning('aiLearningResetComplete', {}, 'Complete AI learning reset finished');
     
     return true;
   }
 
   resetAllBotData() {
-    logService.warning('allBotDataReset', {}, 'Resetting ALL bot data (AI learning + trade history + statistics)');
+    logService.warning('allBotDataResetComplete', {}, 'Resetting ALL bot data (AI learning + trade history + statistics)');
     
     // Reset AI learning first
     this.resetAILearning();

@@ -76,9 +76,6 @@ class LearningService {
   private llama3RequestQueue: Array<() => Promise<any>> = [];
   private llama3Available: boolean = true;
   private llama3LastCheck: number = 0;
-  private llama3RequestQueue: Array<() => Promise<any>> = [];
-  private llama3Available: boolean = true;
-  private llama3LastCheck: number = 0;
   
   // Throttling for learning operations
   private learningOperationThrottle: number = 5000; // 5 seconds
