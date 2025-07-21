@@ -332,7 +332,7 @@ class TradingBot {
       // Apply adaptive strategy analysis
       const adaptiveDecision = this.config.adaptiveStrategyEnabled 
         ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
-        : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
+        : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: this.config.enableAggressiveMode ? 1.5 : 1.0 } };
       
       // Log adaptive decision
       if (this.config.adaptiveStrategyEnabled) {
