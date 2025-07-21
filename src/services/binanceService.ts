@@ -281,6 +281,7 @@ class BinanceService {
 
     ws.onerror = (error) => {
       console.error(`WebSocket error for ${symbol}:`, error);
+       ws.close();
     };
 
     this.wsConnections.set(symbol, ws);
