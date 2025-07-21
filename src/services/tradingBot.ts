@@ -927,9 +927,13 @@ class TradingBot {
       return;
     }
     
-    // Minimum trade validation
-    if (quantity * marketData.price < 10) {
-      console.log(`⚠️ Trade too small for ${symbol}: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`);
+    // Aggressive mode: Ignore minNotional or make it optional (lower threshold)
+    const minTradeValue = this.config.enableAggressiveMode ? 5 : 10;
+    if (quantity * marketData.price < minTradeValue) {
+      logService.warning('tradeBlocked', {
+        symbol,
+        reason: `Trade too small: $${(quantity * marketData.price).toFixed(2)} < $${minTradeValue} minimum`
+      });
       return;
     }
     

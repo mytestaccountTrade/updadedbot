@@ -137,6 +137,30 @@ class BinanceService {
     return { valid: true, adjustedQty };
   }
 
+  // Add method to bypass minNotional for aggressive mode
+  validateOrderQuantityAggressive(symbol: string, quantity: number): { valid: boolean; adjustedQty?: number; error?: string } {
+    const symbolInfo = this.getSymbolInfo(symbol);
+    if (!symbolInfo) {
+      return { valid: false, error: 'Invalid symbol' };
+    }
+
+    if (quantity < symbolInfo.minQty) {
+      return { valid: false, error: `Quantity below minimum: ${symbolInfo.minQty}` };
+    }
+
+    // Adjust quantity to step size
+    const adjustedQty = Math.floor(quantity / symbolInfo.stepSize) * symbolInfo.stepSize;
+    
+    // Aggressive mode: Skip minNotional check or use lower threshold
+    const minNotional = symbolInfo.minNotional * 0.5; // 50% of normal minNotional
+    const currentPrice = this.marketDataCache.get(symbol)?.price || 0;
+    if (adjustedQty * currentPrice < minNotional) {
+      return { valid: false, error: `Order value below aggressive minimum: ${minNotional}` };
+    }
+
+    return { valid: true, adjustedQty };
+  }
+
   private hasValidCredentials(): boolean {
     return this.apiKey.length > 0 && this.apiSecret.length > 0;
   }
