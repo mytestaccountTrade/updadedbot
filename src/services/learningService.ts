@@ -1,4 +1,5 @@
 import { Trade, Position, MarketData } from '../types/trading';
+import { logService } from './logService';
 
 interface TradeRecord {
   id: string;
