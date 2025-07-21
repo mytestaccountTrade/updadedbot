@@ -456,7 +456,10 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                     <button
                       onClick={() => handleChange('strategies', {
                         ...formData.strategies,
-                        volumeSpike: { ...formData.strategies.volumeSpike.enabled, enabled: !formData.strategies.volumeSpike.enabled }
+                        volumeSpike: { 
+  ...formData.strategies.volumeSpike, 
+  enabled: !formData.strategies.volumeSpike.enabled 
+}
                       })}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                         formData.strategies.volumeSpike.enabled ? 'bg-green-600' : 'bg-gray-300'
