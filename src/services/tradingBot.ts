@@ -617,7 +617,7 @@ class TradingBot {
           
           // More aggressive entry - lower confidence threshold
           // Aggressive mode: Use lower confidence threshold and faster decision making
-          const confidenceThreshold = this.config.enableAggressiveMode ? 0.4 : this.config.confidenceThreshold;
+          const confidenceThreshold = this.config.enableAggressiveMode ? 0.1 : this.config.confidenceThreshold;
           if (finalSignal.action !== 'HOLD' && finalSignal.confidence > confidenceThreshold) {
             console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
             await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
