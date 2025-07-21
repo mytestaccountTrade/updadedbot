@@ -265,8 +265,30 @@ class TradingBot {
       // Get news for signal generation
       const news = newsService.getLatestNews();
       
-      // Generate trading signal
-      const signal = await newsService.generateTradingSignal(marketData.symbol, marketData, news);
+      let signal;
+      
+      // Use multi-strategy if enabled
+      if (this.config.enableMultiStrategy) {
+        const strategyResults = await multiStrategyService.evaluateStrategies(
+          marketData.symbol,
+          marketData,
+          news,
+          this.config.strategies
+        );
+        
+        const combinedResult = multiStrategyService.combineStrategyResults(strategyResults);
+        signal = {
+          action: combinedResult.action,
+          confidence: combinedResult.confidence,
+          reasoning: combinedResult.reasoning,
+          sentimentScore: 0 // Will be calculated separately
+        };
+        
+        console.log(`🔀 Multi-strategy result: ${combinedResult.action} (${combinedResult.confidence.toFixed(2)}) - Best: ${combinedResult.bestStrategy}`);
+      } else {
+        // Generate traditional trading signal
+        signal = await newsService.generateTradingSignal(marketData.symbol, marketData, news);
+      }
       
       // Get learning insights
       const learningInsights = await learningService.getMarketInsights();
