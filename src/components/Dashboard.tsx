@@ -15,6 +15,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { learningService } from '../services/learningService';
 import { adaptiveStrategy } from '../services/adaptiveStrategy';
 import { logService } from '../services/logService';
+import { SimulationReplayPanel } from './SimulationReplayPanel';
 
 export const Dashboard: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -353,10 +354,10 @@ export const Dashboard: React.FC = () => {
             )}
             
             {activeTab === 'replay' && (
-  <div>
-    <SimulationReplayPanel />
-  </div>
-)}
+              <div>
+                <SimulationReplayPanel />
+              </div>
+            )}
           </div>
         </div>
       </div>
