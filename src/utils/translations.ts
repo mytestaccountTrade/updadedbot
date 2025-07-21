@@ -97,6 +97,32 @@ export const translations = {
     confidenceThreshold: 'Confidence Threshold',
     confidenceThresholdDescription: 'Minimum confidence required for all AI-based trades and adaptive strategy decisions',
     
+    // Multi-Strategy Settings
+    multiStrategySettings: 'Multi-Strategy Settings',
+    enableMultiStrategy: 'Enable Multi-Strategy',
+    multiStrategyDescription: 'Run multiple AI strategies in parallel and combine their signals',
+    rsiMacdStrategy: 'RSI + MACD Strategy',
+    newsSentimentStrategy: 'News Sentiment Strategy',
+    volumeSpikeStrategy: 'Volume Spike Strategy',
+    strategyWeight: 'Weight',
+    
+    // Auto-Rebalance Settings
+    autoRebalanceSettings: 'Auto-Rebalance and Position Scaling',
+    enableAutoRebalance: 'Enable Auto-Rebalance',
+    autoRebalanceDescription: 'Automatically scale positions up/down based on performance',
+    scaleInThreshold: 'Scale In Threshold',
+    scaleOutThreshold: 'Scale Out Threshold',
+    enableTrailingStop: 'Enable Trailing Stop',
+    trailingStopPercent: 'Trailing Stop %',
+    
+    // Simulation Replay
+    simulationReplay: 'Simulation Replay',
+    enableSimulationReplay: 'Enable Simulation Replay',
+    simulationReplayDescription: 'Test strategies against historical data',
+    runReplay: 'Run Replay',
+    selectDate: 'Select Date',
+    replayResults: 'Replay Results',
+    
     // Sentiment
     bullish: 'BULLISH',
     bearish: 'BEARISH',
