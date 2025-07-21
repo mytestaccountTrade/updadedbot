@@ -353,10 +353,10 @@ export const Dashboard: React.FC = () => {
             )}
             
             {activeTab === 'replay' && (
-              <div>
-                <SimulationReplayPanel />
-              </div>
-            )}
+  <div>
+    <SimulationReplayPanel />
+  </div>
+)}
           </div>
         </div>
       </div>
