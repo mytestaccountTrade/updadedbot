@@ -44,7 +44,7 @@ class TradingBot {
         console.log('📁 Loaded saved bot configuration');
         
         // Merge with defaults to ensure all fields exist
-        return {
+        const config = {
           mode: savedConfig.mode || 'SIMULATION',
           simulationBalance: savedConfig.simulationBalance || 10000,
           fastLearningMode: savedConfig.fastLearningMode || false,
@@ -60,7 +60,40 @@ class TradingBot {
           apiSecret: savedConfig.apiSecret || '',
           llama3Url: savedConfig.llama3Url || 'http://localhost:11434',
           llama3Model: savedConfig.llama3Model || 'llama3',
+          // Multi-strategy settings
+          strategies: {
+            rsiMacd: {
+              enabled: savedConfig.strategies?.rsiMacd?.enabled !== undefined ? savedConfig.strategies.rsiMacd.enabled : true,
+              weight: savedConfig.strategies?.rsiMacd?.weight || 1.0
+            },
+            newsSentiment: {
+              enabled: savedConfig.strategies?.newsSentiment?.enabled !== undefined ? savedConfig.strategies.newsSentiment.enabled : true,
+              weight: savedConfig.strategies?.newsSentiment?.weight || 1.0
+            },
+            volumeSpike: {
+              enabled: savedConfig.strategies?.volumeSpike?.enabled !== undefined ? savedConfig.strategies.volumeSpike.enabled : true,
+              weight: savedConfig.strategies?.volumeSpike?.weight || 1.0
+            }
+          },
+          // Auto-rebalance settings
+          autoRebalance: {
+            enabled: savedConfig.autoRebalance?.enabled || false,
+            scaleInEnabled: savedConfig.autoRebalance?.scaleInEnabled || false,
+            scaleOutEnabled: savedConfig.autoRebalance?.scaleOutEnabled || false,
+            trailingStopEnabled: savedConfig.autoRebalance?.trailingStopEnabled || false,
+            scaleInThreshold: savedConfig.autoRebalance?.scaleInThreshold || 2.0,
+            scaleOutThreshold: savedConfig.autoRebalance?.scaleOutThreshold || -1.5,
+            trailingStopPercent: savedConfig.autoRebalance?.trailingStopPercent || 2.0,
+            maxScaleIns: savedConfig.autoRebalance?.maxScaleIns || 3,
+            maxScaleOuts: savedConfig.autoRebalance?.maxScaleOuts || 3
+          },
+          // Simulation replay settings
+          simulationReplay: {
+            enabled: savedConfig.simulationReplay?.enabled || false
+          }
         };
+        
+        return config;
       }
     } catch (error) {
       console.error('Failed to load saved config:', error);
@@ -84,6 +117,37 @@ class TradingBot {
       apiSecret: '',
       llama3Url: 'http://localhost:11434',
       llama3Model: 'llama3',
+      // Multi-strategy settings
+      strategies: {
+        rsiMacd: {
+          enabled: true,
+          weight: 1.0
+        },
+        newsSentiment: {
+          enabled: true,
+          weight: 1.0
+        },
+        volumeSpike: {
+          enabled: true,
+          weight: 1.0
+        }
+      },
+      // Auto-rebalance settings
+      autoRebalance: {
+        enabled: false,
+        scaleInEnabled: false,
+        scaleOutEnabled: false,
+        trailingStopEnabled: false,
+        scaleInThreshold: 2.0,
+        scaleOutThreshold: -1.5,
+        trailingStopPercent: 2.0,
+        maxScaleIns: 3,
+        maxScaleOuts: 3
+      },
+      // Simulation replay settings
+      simulationReplay: {
+        enabled: false
+      }
     };
   }
 
