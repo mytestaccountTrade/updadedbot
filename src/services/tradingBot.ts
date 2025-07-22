@@ -269,7 +269,7 @@ class TradingBot {
   private async initializeWebSocketSubscriptions() {
     try {
       const tradingPairs = await binanceService.getTradingPairs();
-      const topPairs = tradingPairs.slice(0, 10);
+      const topPairs = tradingPairs.slice(0, 30);
       
       for (const pair of topPairs) {
         if (!this.subscribedSymbols.has(pair.symbol)) {
@@ -573,7 +573,7 @@ class TradingBot {
       
       // Process trading pairs in batches to prevent resource overload
       const batchSize = 3;
-      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 25 : 12);
+      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 35 : 20);
       
       for (let i = 0; i < pairs.length; i += batchSize) {
         // Check if we've reached max positions before processing batch
