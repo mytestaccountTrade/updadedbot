@@ -212,36 +212,42 @@ class BinanceService {
   }
 
   async getTradingPairs(): Promise<TradingPair[]> {
-    // Throttle trading pairs fetch to prevent excessive API calls
-    const now = Date.now();
-    if (now - this.lastTradingPairsFetch < this.tradingPairsThrottle) {
-      console.log('🕒 Trading pairs fetch throttled, using cached data');
-      return this.getCachedTradingPairs();
-    }
-
-    try {
-      this.lastTradingPairsFetch = now;
-      const data = await this.makeRequest('/api/v3/ticker/24hr');
-      const pairs = data
-        .filter((ticker: any) => ticker.symbol.endsWith('USDT') && this.isValidSymbol(ticker.symbol))
-        .slice(0, 20)
-        .map((ticker: any) => ({
-          symbol: ticker.symbol,
-          price: parseFloat(ticker.lastPrice),
-          change24h: parseFloat(ticker.priceChangePercent),
-          volume: parseFloat(ticker.volume),
-          high24h: parseFloat(ticker.highPrice),
-          low24h: parseFloat(ticker.lowPrice),
-        }));
-      
-      // Cache the successful result
-      this.cachedTradingPairs = pairs;
-      return pairs;
-    } catch (error) {
-      console.error('Failed to fetch trading pairs:', error);
-      return [];
-    }
+  const now = Date.now();
+  if (now - this.lastTradingPairsFetch < this.tradingPairsThrottle) {
+    console.log('🕒 Trading pairs fetch throttled, using cached data');
+    return this.getCachedTradingPairs();
   }
+
+  try {
+    this.lastTradingPairsFetch = now;
+    const data = await this.makeRequest('/api/v3/ticker/24hr');
+
+    const excluded = ['USDC', 'BUSD', 'TUSD', 'FDUSD', 'DAI', 'USDP'];
+
+    const pairs = data
+      .filter((ticker: any) =>
+        ticker.symbol.endsWith('USDT') &&
+        this.isValidSymbol(ticker.symbol) &&
+        !excluded.some(stable => ticker.symbol.startsWith(stable))
+      )
+      .sort((a: any, b: any) => parseFloat(b.volume) - parseFloat(a.volume)) // en yüksek hacimli coinleri öne al
+      .slice(0, 20)
+      .map((ticker: any) => ({
+        symbol: ticker.symbol,
+        price: parseFloat(ticker.lastPrice),
+        change24h: parseFloat(ticker.priceChangePercent),
+        volume: parseFloat(ticker.volume),
+        high24h: parseFloat(ticker.highPrice),
+        low24h: parseFloat(ticker.lowPrice),
+      }));
+
+    this.cachedTradingPairs = pairs;
+    return pairs;
+  } catch (error) {
+    console.error('Failed to fetch trading pairs:', error);
+    return [];
+  }
+}
 
   subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
     if (this.wsConnections.has(symbol)) {
