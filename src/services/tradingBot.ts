@@ -17,7 +17,7 @@ class TradingBot {
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
   private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
-
+  let cachedPairs: TradingPair[] | null = null;
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
@@ -268,7 +268,10 @@ class TradingBot {
 
   private async initializeWebSocketSubscriptions() {
     try {
-      const tradingPairs = await binanceService.getTradingPairs();
+      if (!cachedPairs) {
+  cachedPairs = await binanceService.getTradingPairs();
+}
+      const tradingPairs = cachedPairs;
       const topPairs = tradingPairs.slice(0, 30);
       
       for (const pair of topPairs) {
@@ -440,7 +443,10 @@ class TradingBot {
       const learningInsights = await learningService.getMarketInsights();
       
       // Get top trading pairs and news
-      const tradingPairs = await binanceService.getTradingPairs();
+       if (!cachedPairs) {
+  cachedPairs = await binanceService.getTradingPairs();
+}
+      const tradingPairs = cachedPairs;
       const news = newsService.getLatestNews();
       
       // Update existing positions
