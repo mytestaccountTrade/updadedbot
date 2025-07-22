@@ -63,17 +63,17 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onPos
                 </span>
               </td>
               <td className="py-4 px-4 text-gray-900">{position.size.toFixed(6)}</td>
-              <td className="py-4 px-4 text-gray-900">${position.entryPrice.toFixed(2)}</td>
-              <td className="py-4 px-4 text-gray-900">${position.currentPrice.toFixed(2)}</td>
+              <td className="py-4 px-4 text-gray-900">${position.entryPrice.toFixed(6)}</td>
+              <td className="py-4 px-4 text-gray-900">${position.currentPrice.toFixed(6)}</td>
               <td className={`py-4 px-4 font-medium ${
                 position.pnl >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                ${position.pnl.toFixed(2)}
+                ${position.pnl.toFixed(6)}
               </td>
               <td className={`py-4 px-4 font-medium ${
                 position.pnlPercent >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%
+                {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(6)}%
               </td>
               <td className="py-4 px-4 text-gray-500 text-sm">
                 {formatDistanceToNow(new Date(position.timestamp), { addSuffix: true })}
