@@ -1,4 +1,4 @@
-import { BotConfig, Portfolio, Position, Trade, MarketData,TradingPair } from '../types/trading';
+import { BotConfig, Portfolio, Position, Trade, MarketData } from '../types/trading';
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
@@ -17,7 +17,6 @@ class TradingBot {
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
   private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
-  private cachedPairs: TradingPair[] | null = null;
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
@@ -268,11 +267,8 @@ class TradingBot {
 
   private async initializeWebSocketSubscriptions() {
     try {
-      if (!this.cachedPairs) {
-  this.cachedPairs = await binanceService.getTradingPairs();
-}
-const tradingPairs = this.cachedPairs;
-      const topPairs = tradingPairs.slice(0, 30);
+      const tradingPairs = await binanceService.getTradingPairs();
+      const topPairs = tradingPairs.slice(0, 10);
       
       for (const pair of topPairs) {
         if (!this.subscribedSymbols.has(pair.symbol)) {
@@ -443,10 +439,7 @@ const tradingPairs = this.cachedPairs;
       const learningInsights = await learningService.getMarketInsights();
       
       // Get top trading pairs and news
-      if (!this.cachedPairs) {
-  this.cachedPairs = await binanceService.getTradingPairs();
-}
-const tradingPairs = this.cachedPairs;
+      const tradingPairs = await binanceService.getTradingPairs();
       const news = newsService.getLatestNews();
       
       // Update existing positions
@@ -579,7 +572,7 @@ const tradingPairs = this.cachedPairs;
       
       // Process trading pairs in batches to prevent resource overload
       const batchSize = 3;
-      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 35 : 20);
+      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 25 : 12);
       
       for (let i = 0; i < pairs.length; i += batchSize) {
         // Check if we've reached max positions before processing batch
