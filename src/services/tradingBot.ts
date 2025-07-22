@@ -4,7 +4,7 @@ import { newsService } from './newsService';
 import { learningService } from './learningService';
 import { adaptiveStrategy } from './adaptiveStrategy';
 import { logService } from './logService';
-
+let cachedPairs: TradingPair[] | null = null;
 class TradingBot {
   private config: BotConfig;
   private portfolio: Portfolio;
@@ -17,7 +17,6 @@ class TradingBot {
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
   private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
-  private cachedPairs: TradingPair[] | null = null;
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
