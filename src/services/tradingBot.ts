@@ -352,7 +352,9 @@ class TradingBot {
       }
       
       // Combine signals with adaptive confidence
-      const finalConfidence = (enhancedSignal.confidence + adaptiveDecision.confidence) / 2;
+      const finalConfidence = this.config.adaptiveStrategyEnabled
+  ? (enhancedSignal.confidence + adaptiveDecision.confidence) / 2
+  : enhancedSignal.confidence;
       const finalSignal = {
         ...enhancedSignal,
         confidence: finalConfidence,
