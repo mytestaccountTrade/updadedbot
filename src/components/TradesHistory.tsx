@@ -59,7 +59,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               </td>
               <td className="py-4 px-4 text-gray-900">{trade.type}</td>
               <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
-              <td className="py-4 px-4 text-gray-900">${trade.price.toFixed(2)}</td>
+              <td className="py-4 px-4 text-gray-900">${trade.price.toFixed(6)}</td>
               <td className="py-4 px-4">
                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                   trade.status === 'FILLED' 
@@ -76,7 +76,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
                   ? trade.profit >= 0 ? 'text-green-600' : 'text-red-600'
                   : 'text-gray-400'
               }`}>
-                {trade.profit ? `$${trade.profit.toFixed(2)}` : '-'}
+                {trade.profit ? `$${trade.profit.toFixed(6)}` : '-'}
               </td>
             </tr>
           ))}
