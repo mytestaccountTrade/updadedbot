@@ -30,7 +30,7 @@ export const Dashboard: React.FC = () => {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   
   useEffect(() => {
-    fetchData();
+    await fetchData();
     updateLearningStats();
     const interval = setInterval(fetchData, 30000);
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
