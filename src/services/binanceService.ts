@@ -211,11 +211,11 @@ class BinanceService {
     }
   }
 
-  async getTradingPairs(): Promise<TradingPair[]> {
+  async getTradingPairs(limit: number = 100): Promise<TradingPair[]> {
   const now = Date.now();
   if (now - this.lastTradingPairsFetch < this.tradingPairsThrottle) {
     console.log('🕒 Trading pairs fetch throttled, using cached data');
-    return this.getCachedTradingPairs();
+    return this.getCachedTradingPairs(limit);
   }
 
   try {
@@ -231,7 +231,7 @@ class BinanceService {
         !excluded.some(stable => ticker.symbol.startsWith(stable))
       )
       .sort((a: any, b: any) => parseFloat(b.volume) - parseFloat(a.volume)) // en yüksek hacimli coinleri öne al
-      .slice(0, 100)
+      .slice(0, limit)
       .map((ticker: any) => ({
         symbol: ticker.symbol,
         price: parseFloat(ticker.lastPrice),
