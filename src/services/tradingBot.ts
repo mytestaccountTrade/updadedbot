@@ -1089,7 +1089,7 @@ const entryFee = entryCost * COMMISSION_RATE;
 
   // Açılış trade'ini bul
   const originalTrade = this.portfolio.trades.find(t => t.id === position.id);
-
+    
   if (!originalTrade) {
     console.warn(`🔍 No original trade found for position ID ${position.id}. Skipping close.`);
     return false;
@@ -1113,6 +1113,8 @@ const entryFee = entryCost * COMMISSION_RATE;
     originalTrade.profit = position.pnl;
     originalTrade.closeTimestamp = closeTimestamp;
     originalTrade.status = realTrade.status;
+    const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
+originalTrade.duration = duration;
   } else {
     // Simülasyon modunda fiyatı ve kârı hesapla
     const COMMISSION_RATE = 0.001;
@@ -1125,6 +1127,8 @@ const entryFee = entryCost * COMMISSION_RATE;
     originalTrade.profit = position.pnl;
     originalTrade.closeTimestamp = closeTimestamp;
     originalTrade.status = 'FILLED';
+    const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
+originalTrade.duration = duration;
 
     this.portfolio.availableBalance += netExit;
   }
