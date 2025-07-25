@@ -30,8 +30,10 @@ export const Dashboard: React.FC = () => {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   
   useEffect(() => {
-    await fetchData();
+    const timeout = setTimeout(() => {
+    fetchData();
     updateLearningStats();
+  }, 300); // 300-500 ms arası genelde yeter
     const interval = setInterval(fetchData, 30000);
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
     
