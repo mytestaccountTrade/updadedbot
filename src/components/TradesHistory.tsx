@@ -10,6 +10,20 @@ interface TradesHistoryProps {
 
 const ITEMS_PER_PAGE = 10;
 
+// 🔧 Süreyi okunabilir formata çeviren yardımcı fonksiyon
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+
+  return parts.join(' ');
+}
+
 export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
   const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,7 +37,6 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
   }
 
   const sortedTrades = [...trades].sort((a, b) => b.timestamp - a.timestamp);
-
   const totalPages = Math.ceil(sortedTrades.length / ITEMS_PER_PAGE);
   const paginatedTrades = sortedTrades.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -44,6 +57,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
             <th className="text-left py-3 px-4">{t('exitPrice')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('duration')}</th>
           </tr>
         </thead>
         <tbody>
@@ -94,8 +108,8 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
                 {trade.profit ? `$${trade.profit.toFixed(6)}` : '-'}
               </td>
               <td className="py-4 px-4 text-gray-900">
-  {trade.duration ? `${Math.floor(trade.duration / 1000)}s` : '-'}
-</td>
+                {typeof trade.duration === 'number' ? formatDuration(trade.duration) : '-'}
+              </td>
             </tr>
           ))}
         </tbody>
