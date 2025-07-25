@@ -63,8 +63,8 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
     <th className="text-left py-3 px-4">{t('side')}</th>
     <th className="text-left py-3 px-4">{t('type')}</th>
     <th className="text-left py-3 px-4">{t('quantity')}</th>
-    <th className="text-left py-3 px-4">{t('entry')}</th>
-    <th className="text-left py-3 px-4">{t('exit')}</th>
+    <th className="text-left py-3 px-4">{t('entryPrice')}</th>
+    <th className="text-left py-3 px-4">{t('exitPrice')}</th>
     <th className="text-left py-3 px-4">{t('status')}</th>
     <th className="text-left py-3 px-4">{t('profit')}</th>
     <th className="text-left py-3 px-4">{t('duration')}</th>
