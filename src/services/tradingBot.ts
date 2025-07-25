@@ -753,41 +753,46 @@ class TradingBot {
   }
 
   private checkTraditionalExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
-    // Aggressive mode: Quick exits with lower profit targets and tighter stop losses
-    let stopLossThreshold: number;
-    let takeProfitThreshold: number;
-    
-    if (this.config.enableAggressiveMode) {
-      // Aggressive mode: Quick 1-2% profit target, 2% stop loss
-     stopLossThreshold = -2.5;
-     takeProfitThreshold = 1;
-    } else if (this.config.fastLearningMode) {
-      stopLossThreshold = -1.5;
-      takeProfitThreshold = 2.5;
-    } else {
-      stopLossThreshold = -this.config.stopLossPercent * 100;
-      takeProfitThreshold = this.config.takeProfitPercent * 100;
-    }
-      
-    // Adaptive thresholds based on volatility
-    const volatility = marketData.bollinger ? 
-      (marketData.bollinger.upper - marketData.bollinger.lower) / marketData.bollinger.middle : 0.02;
-    
-    const volatilityMultiplier = Math.max(0.5, Math.min(2, volatility * 50));
-    const adaptiveStopLoss = stopLossThreshold * volatilityMultiplier;
-    const adaptiveTakeProfit = takeProfitThreshold * volatilityMultiplier;
-      
-    // Check stop loss
-    if (position.pnlPercent <= adaptiveStopLoss) {
-      return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
-    }
-    // Check take profit
-    if (position.pnlPercent >= adaptiveTakeProfit) {
-      return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
-    }
-    
-    return { shouldExit: false, reason: '' };
+  // 📉 Varsayılan oranlar
+  let stopLossThreshold: number;
+  let takeProfitThreshold: number;
+
+  const COMMISSION_BUFFER = 0.3; // Komisyonları hesaba kat (%0.3)
+
+  if (this.config.enableAggressiveMode) {
+    // ⚡ Agresif mod: hızlı ama dengeli kazanç hedefi
+    takeProfitThreshold = 2.0;   // %2.5 kâr
+    stopLossThreshold = -1.25;   // -%1.25 zarar
+  } else if (this.config.fastLearningMode) {
+    takeProfitThreshold = 2.5;
+    stopLossThreshold = -1.5;
+  } else {
+    stopLossThreshold = -this.config.stopLossPercent * 100;
+    takeProfitThreshold = this.config.takeProfitPercent * 100;
   }
+
+  // 🌪️ Volatiliteye göre çarpan hesapla
+  const volatility = marketData.bollinger
+    ? (marketData.bollinger.upper - marketData.bollinger.lower) / marketData.bollinger.middle
+    : 0.02;
+
+  const volatilityMultiplier = Math.max(0.5, Math.min(2, volatility * 50));
+
+  const adaptiveStopLoss = (stopLossThreshold - COMMISSION_BUFFER) * volatilityMultiplier;
+  const adaptiveTakeProfit = (takeProfitThreshold + COMMISSION_BUFFER) * volatilityMultiplier;
+
+  // 🚨 Stop Loss
+  if (position.pnlPercent <= adaptiveStopLoss) {
+    return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
+  }
+
+  // 🎯 Take Profit
+  if (position.pnlPercent >= adaptiveTakeProfit) {
+    return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
+  }
+
+  return { shouldExit: false, reason: '' };
+}
 
   private checkMultiExitLevels(position: Position, currentPrice: number): { shouldExit: boolean; reason: string } {
     const exitData = this.multiExitPositions.get(position.id);
