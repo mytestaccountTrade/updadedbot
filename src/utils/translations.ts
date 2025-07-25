@@ -196,7 +196,12 @@ export const translations = {
     maxSymbolsToTrade_description: 'Specifies how many coins the bot will monitor simultaneously. Highest volume coins are prioritized.',
      prev: "Back",
   next: "Next",
-  page: "Page"
+  page: "Page",
+     duration: "Duration",
+  seconds: "seconds",
+  minutes: "minutes",
+  hours: "hours",
+  days: "days"
   },
   tr: {
     // Header
@@ -395,7 +400,12 @@ export const translations = {
 maxSymbolsToTrade_description: 'Botun aynı anda takip edeceği maksimum coin sayısını belirler. En yüksek hacimli coinler öncelikli alınır.',
     prev: "Geri",
   next: "İleri",
-  page: "Sayfa"
+  page: "Sayfa",
+    duration: "Süre",
+  seconds: "saniye",
+  minutes: "dakika",
+  hours: "saat",
+  days: "gün"
   },
 };
 
