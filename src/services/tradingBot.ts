@@ -289,6 +289,7 @@ class TradingBot {
     // WebSocket-driven Fast Learning Mode
     if (this.config.fastLearningMode && this.config.mode === 'SIMULATION') {
       // Execute aggressive trading on every WebSocket update
+      this.updatePositions();  // 💡 bu satır eklenmeli
       this.executeWebSocketFastLearning(marketData);
     }
   }
