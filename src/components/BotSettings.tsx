@@ -677,6 +677,21 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
             </div>
           )}
         </div>
+        <div className="form-group">
+  <label htmlFor="maxSymbolsToTrade" className="text-sm font-medium text-gray-900">
+    {t('maxSymbolsToTrade')}
+  </label>
+  <input
+    id="maxSymbolsToTrade"
+    type="number"
+    className="form-control"
+    value={config.maxSymbolsToTrade}
+    onChange={(e) => updateConfig({ ...config, maxSymbolsToTrade: Number(e.target.value) })}
+    min={1}
+    max={500}
+  />
+  <p className="text-xs text-gray-500">{t('maxSymbolsToTrade_description')}</p>
+</div>
 
           {/* Risk Management */}
           <div className="space-y-4">
