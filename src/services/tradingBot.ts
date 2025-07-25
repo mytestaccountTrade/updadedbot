@@ -57,6 +57,7 @@ class TradingBot {
           llama3Model: savedConfig.llama3Model || 'llama3',
           // Multi-strategy settings
           enableMultiStrategy: savedConfig.enableMultiStrategy !== undefined ? savedConfig.enableMultiStrategy : false,
+          maxSymbolsToTrade: savedConfig.maxSymbolsToTrade || 50,
           strategies: {
             rsiMacd: {
               enabled: savedConfig.strategies?.rsiMacd?.enabled !== undefined ? savedConfig.strategies.rsiMacd.enabled : true,
