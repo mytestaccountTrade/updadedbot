@@ -267,24 +267,31 @@ class TradingBot {
   }
 
   private async initializeWebSocketSubscriptions() {
-    try {
-      const tradingPairs = await binanceService.getTradingPairs(this.config.maxSymbolsToTrade);
-      const topPairs = tradingPairs.slice(0, 100);
-      
-      for (const pair of topPairs) {
-        if (!this.subscribedSymbols.has(pair.symbol)) {
-          binanceService.subscribeToMarketData(pair.symbol, (marketData) => {
-            this.onMarketDataUpdate(marketData);
-          });
-          this.subscribedSymbols.add(pair.symbol);
-        }
+  try {
+    const tradingPairs = await binanceService.getTradingPairs(this.config.maxSymbolsToTrade);
+
+    for (const pair of tradingPairs) {
+      if (!this.subscribedSymbols.has(pair.symbol)) {
+        binanceService.subscribeToMarketData(pair.symbol, (marketData) => {
+          this.onMarketDataUpdate(marketData);
+        });
+        this.subscribedSymbols.add(pair.symbol);
       }
-      
-      logService.info('websocketSubscribed', { count: topPairs.length }, `Subscribed to ${topPairs.length} WebSocket streams`);
-    } catch (error) {
-      logService.error('websocketSubscriptionFailed', {   error: error instanceof Error ? error.message : String(error)  }, 'Failed to initialize WebSocket subscriptions');
     }
+
+    logService.info(
+      'websocketSubscribed',
+      { count: tradingPairs.length },
+      `Subscribed to ${tradingPairs.length} WebSocket streams`
+    );
+  } catch (error) {
+    logService.error(
+      'websocketSubscriptionFailed',
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to initialize WebSocket subscriptions'
+    );
   }
+}
 
   private onMarketDataUpdate(marketData: MarketData) {
     // WebSocket-driven Fast Learning Mode
