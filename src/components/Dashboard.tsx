@@ -45,9 +45,8 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   const fetchData = async () => {
+  setIsInitialLoading(true);
   try {
-    setIsInitialLoading(true);
-
     if (tradingBot.getConfig().mode === 'REAL') {
       await tradingBot.updateRealWalletBalance();
     }
@@ -60,9 +59,11 @@ export const Dashboard: React.FC = () => {
     setTradingPairs(pairs);
     setNews(newsData);
     setPortfolio(tradingBot.getPortfolio());
+
+    // Delay before turning off loading for smoother visual experience
+    setTimeout(() => setIsInitialLoading(false), 300); // 300ms gecikme
   } catch (error) {
     console.error('Failed to fetch data:', error);
-  } finally {
     setIsInitialLoading(false);
   }
 };
