@@ -1,4 +1,4 @@
-import { MarketData, Position, Trade } from '../types/trading';
+import {BotConfig, MarketData, Position, Trade } from '../types/trading';
 
 export interface MarketCondition {
   type: 'TRENDING_UP' | 'TRENDING_DOWN' | 'SIDEWAYS' | 'UNCERTAIN' | 'HIGH_VOLATILITY';
