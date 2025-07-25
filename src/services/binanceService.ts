@@ -625,12 +625,10 @@ class BinanceService {
     this.wsConnections.clear();
   }
 
-  private getCachedTradingPairs(): TradingPair[] {
-    if (this.cachedTradingPairs.length > 0) {
-      return this.cachedTradingPairs;
-    }
-    return this.getMockTradingPairs();
-  }
+  getCachedTradingPairs(limit?: number): TradingPair[] {
+  if (!this.cachedTradingPairs || this.cachedTradingPairs.length === 0) return [];
+  return limit ? this.cachedTradingPairs.slice(0, limit) : this.cachedTradingPairs;
+}
 
   private getMockTradingPairs(): TradingPair[] {
     return [
