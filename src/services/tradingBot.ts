@@ -538,94 +538,80 @@ class TradingBot {
   }
 
   private async runTradingLoop() {
-    try {
-      // Get learning insights before making decisions
-      const learningInsights = await learningService.getMarketInsights();
-      
-      // Fetch market data
-      const tradingPairs = await binanceService.getTradingPairs();
-      const news = await newsService.fetchCryptoNews();
-      
-      // Update existing positions
-      await this.updatePositions();
-      
-      logService.info('portfolioStatus', {
-        positions: this.portfolio.positions.length,
-        totalValue: this.portfolio.totalValue.toFixed(2),
-        totalPnl: this.portfolio.totalPnl.toFixed(2)
-      });
-      
-      // Process trading pairs in batches to prevent resource overload
-      const batchSize = 3;
-      const pairs = tradingPairs.slice(0, this.config.enableAggressiveMode ? 100 : 80);
-      
-      for (let i = 0; i < pairs.length; i += batchSize) {
-        // Check if we've reached max positions before processing batch
-        // Aggressive mode: Allow up to 40 positions, normal mode: use configured max
-        const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
-        if (this.portfolio.positions.length >= maxPositions) break;
-        
-        const batch = pairs.slice(i, i + batchSize);
-        
-        // Process batch in parallel but with limited concurrency
-        await Promise.all(batch.map(async (pair) => {
-          // Skip if we already have a position in this symbol
-          if (!this.config.enableAggressiveMode && this.activePositionIds.has(pair.symbol)) return;
+  try {
+    const learningInsights = await learningService.getMarketInsights();
+    const tradingPairs = await binanceService.getTradingPairs(this.config.maxSymbolsToTrade); // <-- dinamik
+    const news = await newsService.fetchCryptoNews();
+    await this.updatePositions();
 
-          
-          const marketData = await binanceService.getMarketData(pair.symbol);
-          if (!marketData) return;
-          
-          const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
-          
-          // Apply learning insights to improve decision making
-          const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
-          
-          // Apply adaptive strategy analysis
-          const adaptiveDecision = this.config.adaptiveStrategyEnabled 
-            ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
-            : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 } };
-          
-          if (!adaptiveDecision.shouldTrade) {
-            return; // Skip this pair
-          }
-          
-          // Combine signals
-          const finalConfidence = this.config.adaptiveStrategyEnabled
-  ? (enhancedSignal.confidence + adaptiveDecision.confidence) / 2
-  : enhancedSignal.confidence;
-          const finalSignal = {
-            ...enhancedSignal,
-            confidence: finalConfidence
-          };
-          
-          // Log confidence threshold for debugging
-          console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
-          
-          // More aggressive entry - lower confidence threshold
-          // Aggressive mode: Use lower confidence threshold and faster decision making
-          const confidenceThreshold = this.config.enableAggressiveMode ? 0.1 : this.config.confidenceThreshold;
-          if (finalSignal.action !== 'HOLD' && finalSignal.confidence > confidenceThreshold) {
-            console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
-            await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
-          }
-        }));
-        
-        // Add small delay between batches to prevent overwhelming the system
-        if (i + batchSize < pairs.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+    logService.info('portfolioStatus', {
+      positions: this.portfolio.positions.length,
+      totalValue: this.portfolio.totalValue.toFixed(2),
+      totalPnl: this.portfolio.totalPnl.toFixed(2),
+    });
+
+    const batchSize = 3;
+    const pairs = tradingPairs; // slice artık gereksiz çünkü yukarıda limitli geliyor
+
+    for (let i = 0; i < pairs.length; i += batchSize) {
+      const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
+      if (this.portfolio.positions.length >= maxPositions) break;
+
+      const batch = pairs.slice(i, i + batchSize);
+
+      await Promise.all(batch.map(async (pair) => {
+        if (!this.config.enableAggressiveMode && this.activePositionIds.has(pair.symbol)) return;
+
+        const marketData = await binanceService.getMarketData(pair.symbol);
+        if (!marketData) return;
+
+        const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
+        const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+
+        const adaptiveDecision = this.config.adaptiveStrategyEnabled
+          ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
+          : {
+              shouldTrade: true,
+              reason: 'Static strategy mode',
+              confidence: 0.7,
+              strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 },
+            };
+
+        if (!adaptiveDecision.shouldTrade) return;
+
+        const finalConfidence = this.config.adaptiveStrategyEnabled
+          ? (enhancedSignal.confidence + adaptiveDecision.confidence) / 2
+          : enhancedSignal.confidence;
+
+        const finalSignal = {
+          ...enhancedSignal,
+          confidence: finalConfidence,
+        };
+
+        console.log(`🎯 Active confidence threshold: ${this.config.confidenceThreshold}, Final confidence: ${finalConfidence.toFixed(3)}`);
+
+        const confidenceThreshold = this.config.enableAggressiveMode ? 0.1 : this.config.confidenceThreshold;
+
+        if (finalSignal.action !== 'HOLD' && finalSignal.confidence > confidenceThreshold) {
+          console.log(`🎯 Trading signal: ${finalSignal.action} ${pair.symbol} (confidence: ${finalSignal.confidence.toFixed(2)})`);
+          await this.executeTrade(pair.symbol, finalSignal.action, marketData, finalSignal, adaptiveDecision.strategy);
         }
+      }));
+
+      if (i + batchSize < pairs.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      
-      // Update portfolio metrics
-      this.updatePortfolioMetrics();
-      
-    } catch (error) {
-      logService.error('tradingLoopError', { 
-        error: error instanceof Error ? error.message : String(error) 
-      }, 'Trading loop error');
     }
+
+    this.updatePortfolioMetrics();
+  } catch (error) {
+    logService.error(
+      'tradingLoopError',
+      { error: error instanceof Error ? error.message : String(error) },
+      'Trading loop error'
+    );
   }
+}
 
   private async updatePositions() {
     if (this.portfolio.positions.length === 0) return;
