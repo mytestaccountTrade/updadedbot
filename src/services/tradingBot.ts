@@ -1124,7 +1124,7 @@ const entryFee = entryCost * COMMISSION_RATE;
 const exitFee = grossExit * COMMISSION_RATE;
 const netExit = grossExit - exitFee;
     this.portfolio.trades.push(trade);
-    this.portfolio.availableBalance += position.size * position.currentPrice;
+    this.portfolio.availableBalance += netExit;
     
     // Record position close for learning
     await learningService.recordPositionClose(position, trade, reason);
