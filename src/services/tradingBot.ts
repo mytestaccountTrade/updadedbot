@@ -985,10 +985,14 @@ class TradingBot {
         profitTarget: '1-2%'
       }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
     }
-    
+      const COMMISSION_RATE = 0.001; // %0.1 Binance spot varsayılan
+
+// Hesapla
+const entryCost = quantity * marketData.price;
+const entryFee = entryCost * COMMISSION_RATE;
     // Record trade for learning
     await learningService.recordTrade(trade, position, tradeContext);
-    this.portfolio.availableBalance -= quantity * marketData.price;
+    this.portfolio.availableBalance -= entryCost + entryFee;
     
     console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
     console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
@@ -1115,7 +1119,10 @@ class TradingBot {
       trade.price = realTrade.price;
       trade.status = realTrade.status;
     }
-    
+     const COMMISSION_RATE = 0.001;
+    const grossExit = position.size * position.currentPrice;
+const exitFee = grossExit * COMMISSION_RATE;
+const netExit = grossExit - exitFee;
     this.portfolio.trades.push(trade);
     this.portfolio.availableBalance += position.size * position.currentPrice;
     
