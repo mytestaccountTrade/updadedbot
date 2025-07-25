@@ -26,8 +26,12 @@ export interface Trade {
   type: 'MARKET' | 'LIMIT' | 'STOP_LOSS';
   quantity: number;
   price: number;
-  status: 'FILLED' | 'PENDING' | 'CANCELLED';
+  status: 'PENDING' | 'FILLED' | 'CANCELLED';
   timestamp: number;
+
+  // yeni alanlar
+  closeTimestamp?: number;
+  exitPrice?: number;
   profit?: number;
 }
 
