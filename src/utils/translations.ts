@@ -192,6 +192,8 @@ export const translations = {
     tradingSignalGenerated: 'Trading signal: {action} {symbol} (confidence: {confidence})',
     tradingLoopError: 'Trading loop error',
     aggressiveTradeExecuted: 'Aggressive trade: {action} {symbol} ({positions}/{maxPositions} positions, {profitTarget} target)',
+    maxSymbolsToTrade: 'Number of Coins to Trade',
+    maxSymbolsToTrade_description: 'Specifies how many coins the bot will monitor simultaneously. Highest volume coins are prioritized.'
   },
   tr: {
     // Header
