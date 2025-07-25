@@ -93,6 +93,9 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               }`}>
                 {trade.profit ? `$${trade.profit.toFixed(6)}` : '-'}
               </td>
+              <td className="py-4 px-4 text-gray-900">
+  {trade.duration ? `${Math.floor(trade.duration / 1000)}s` : '-'}
+</td>
             </tr>
           ))}
         </tbody>
