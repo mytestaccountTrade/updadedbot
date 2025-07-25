@@ -388,6 +388,8 @@ export const translations = {
     tradingSignalGenerated: 'Ticaret sinyali: {action} {symbol} (güven: {confidence})',
     tradingLoopError: 'Ticaret döngüsü hatası',
     aggressiveTradeExecuted: 'Agresif ticaret: {action} {symbol} ({positions}/{maxPositions} pozisyon, {profitTarget} hedef)',
+    maxSymbolsToTrade: 'İşlem Yapılacak Coin Sayısı',
+maxSymbolsToTrade_description: 'Botun aynı anda takip edeceği maksimum coin sayısını belirler. En yüksek hacimli coinler öncelikli alınır.'
   },
 };
 
