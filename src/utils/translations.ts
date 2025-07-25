@@ -193,7 +193,10 @@ export const translations = {
     tradingLoopError: 'Trading loop error',
     aggressiveTradeExecuted: 'Aggressive trade: {action} {symbol} ({positions}/{maxPositions} positions, {profitTarget} target)',
     maxSymbolsToTrade: 'Number of Coins to Trade',
-    maxSymbolsToTrade_description: 'Specifies how many coins the bot will monitor simultaneously. Highest volume coins are prioritized.'
+    maxSymbolsToTrade_description: 'Specifies how many coins the bot will monitor simultaneously. Highest volume coins are prioritized.',
+     prev: "Back",
+  next: "Next",
+  page: "Page"
   },
   tr: {
     // Header
@@ -389,7 +392,10 @@ export const translations = {
     tradingLoopError: 'Ticaret döngüsü hatası',
     aggressiveTradeExecuted: 'Agresif ticaret: {action} {symbol} ({positions}/{maxPositions} pozisyon, {profitTarget} hedef)',
     maxSymbolsToTrade: 'İşlem Yapılacak Coin Sayısı',
-maxSymbolsToTrade_description: 'Botun aynı anda takip edeceği maksimum coin sayısını belirler. En yüksek hacimli coinler öncelikli alınır.'
+maxSymbolsToTrade_description: 'Botun aynı anda takip edeceği maksimum coin sayısını belirler. En yüksek hacimli coinler öncelikli alınır.',
+    prev: "Geri",
+  next: "İleri",
+  page: "Sayfa"
   },
 };
 
