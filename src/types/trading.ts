@@ -64,7 +64,7 @@ export interface BotConfig {
   stopLossPercent: number;
   takeProfitPercent: number;
   maxPositions: number;
-  maxSymbolsToTrade?: number; // eklenecek alan
+  maxSymbolsToTrade: number; // eklenecek alan
   enableNewsTrading: boolean;
   enableTechnicalAnalysis: boolean;
   confidenceThreshold: number; // Unified confidence threshold for both AI and adaptive strategy
