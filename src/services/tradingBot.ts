@@ -102,6 +102,7 @@ class TradingBot {
       stopLossPercent: 0.03,
       takeProfitPercent: 0.06,
       maxPositions: 8,
+      maxSymbolsToTrade: 50,
       enableNewsTrading: true,
       enableTechnicalAnalysis: true,
       confidenceThreshold: 0.80,
