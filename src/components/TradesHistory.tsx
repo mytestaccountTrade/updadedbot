@@ -10,6 +10,16 @@ interface TradesHistoryProps {
 
 const ITEMS_PER_PAGE = 10;
 
+const formatDuration = (seconds: number, t: (key: string) => string) => {
+  if (seconds < 60) return `${seconds} ${t('seconds')}`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} ${t('minutes')}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${t('hours')}`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${t('days')}`;
+};
+
 export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
   const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,7 +28,6 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
     const map = new Map<string, Trade>();
 
     for (const trade of trades) {
-      // Trade daha önce varsa ve profit eklendiyse güncelle
       const existing = map.get(trade.id);
       if (existing) {
         if (trade.profit !== undefined) {
@@ -57,6 +66,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
             <th className="text-left py-3 px-4">{t('price')}</th>
             <th className="text-left py-3 px-4">{t('status')}</th>
             <th className="text-left py-3 px-4">{t('profit')}</th>
+            <th className="text-left py-3 px-4">{t('duration')}</th>
           </tr>
         </thead>
         <tbody>
@@ -93,12 +103,14 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               }`}>
                 {trade.profit !== undefined ? `$${trade.profit.toFixed(6)}` : '-'}
               </td>
+              <td className="py-4 px-4 text-gray-700 text-sm">
+                {trade.duration !== undefined ? formatDuration(trade.duration, t) : '-'}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Sayfalama Kontrolleri */}
       <div className="flex justify-between items-center mt-4">
         <button
           onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
