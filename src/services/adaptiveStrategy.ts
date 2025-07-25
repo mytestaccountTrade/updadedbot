@@ -395,7 +395,8 @@ class AdaptiveStrategyService {
     }
 
     // Learn from profitable trades
-    if (isWin && position.pnlPercent > 2) {
+    const threshold = this.config.aggressiveMode ? 1 : 2;
+    if (isWin && position.pnlPercent > threshold) {
       this.learnFromProfitableTrade(trade, position, marketData);
     }
 
