@@ -28,7 +28,7 @@ export const Dashboard: React.FC = () => {
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news' | 'logs'| 'replay'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  
   useEffect(() => {
     fetchData();
     updateLearningStats();
@@ -45,28 +45,24 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   const fetchData = async () => {
-  setIsInitialLoading(true);
-  try {
-    if (tradingBot.getConfig().mode === 'REAL') {
-      await tradingBot.updateRealWalletBalance();
+    try {
+      // Update real wallet balance if in real mode
+      if (tradingBot.getConfig().mode === 'REAL') {
+        await tradingBot.updateRealWalletBalance();
+      }
+      
+      const [pairs, newsData] = await Promise.all([
+        binanceService.getTradingPairs(),
+        newsService.fetchCryptoNews()
+      ]);
+      
+      setTradingPairs(pairs);
+      setNews(newsData);
+      setPortfolio(tradingBot.getPortfolio());
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
     }
-
-    const [pairs, newsData] = await Promise.all([
-      binanceService.getTradingPairs(),
-      newsService.fetchCryptoNews()
-    ]);
-
-    setTradingPairs(pairs);
-    setNews(newsData);
-    setPortfolio(tradingBot.getPortfolio());
-
-    // Delay before turning off loading for smoother visual experience
-    setTimeout(() => setIsInitialLoading(false), 300); // 300ms gecikme
-  } catch (error) {
-    console.error('Failed to fetch data:', error);
-    setIsInitialLoading(false);
-  }
-};
+  };
 
   const updateLearningStats = () => {
     const stats = learningService.getLearningStats();
@@ -101,15 +97,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-       {/* Loading Overlay */}
-    {isInitialLoading && (
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center">
-        <div className="text-white text-lg animate-pulse">
-          İşlem çiftleri güncelleniyor...
-        </div>
-      </div>
-    )}
-      {/* Header */}  
+      {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
