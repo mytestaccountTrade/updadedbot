@@ -919,7 +919,7 @@ class TradingBot {
       type: 'MARKET',
       quantity,
       price: marketData.price,
-      status: 'FILLED',
+      status: 'PENDING',
       timestamp: Date.now(),
     };
     
@@ -1085,62 +1085,68 @@ const entryFee = entryCost * COMMISSION_RATE;
   }
 
   private async closePositionInternal(position: Position, reason: string) {
-    const closeTradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const trade: Trade = {
-      id: closeTradeId,
-      symbol: position.symbol,
-      side: position.side === 'LONG' ? 'SELL' : 'BUY',
-      type: 'MARKET',
-      quantity: position.size,
-      price: position.currentPrice,
-      status: 'FILLED',
-      timestamp: Date.now(),
-      profit: position.pnl,
-    };
-    
-    if (this.config.mode === 'REAL') {
-      const realTrade = await binanceService.placeTrade(
-        position.symbol,
-        position.side === 'LONG' ? 'SELL' : 'BUY',
-        position.size
-      );
-      if (!realTrade) {
-        console.error(`❌ Failed to execute real trade for closing position ${position.symbol}`);
-        return false;
-      }
-      
-      trade.id = realTrade.id;
-      trade.price = realTrade.price;
-      trade.status = realTrade.status;
-    }
-     const COMMISSION_RATE = 0.001;
-    const grossExit = position.size * position.currentPrice;
-const exitFee = grossExit * COMMISSION_RATE;
-const netExit = grossExit - exitFee;
-    this.portfolio.trades.push(trade);
-    this.portfolio.availableBalance += netExit;
-    
-    // Record position close for learning
-    await learningService.recordPositionClose(position, trade, reason);
-    
-    // Record for adaptive strategy learning
-    const originalTrade = this.portfolio.trades.find(t => t.id === position.id);
-    if (originalTrade) {
-      const marketData = await binanceService.getMarketData(position.symbol);
-      if (marketData) {
-        adaptiveStrategy.recordTradeOutcome(originalTrade, position, marketData);
-      }
-    }
-    
-    // Remove position
-    this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
-    this.activePositionIds.delete(position.symbol);
-    this.multiExitPositions.delete(position.id);
-    
-    console.log(`Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
-    return true;
+  const closeTimestamp = Date.now();
+
+  // Açılış trade'ini bul
+  const originalTrade = this.portfolio.trades.find(t => t.id === position.id);
+
+  if (!originalTrade) {
+    console.warn(`🔍 No original trade found for position ID ${position.id}. Skipping close.`);
+    return false;
   }
+
+  // Gerçek modda API ile satış yap
+  if (this.config.mode === 'REAL') {
+    const realTrade = await binanceService.placeTrade(
+      position.symbol,
+      position.side === 'LONG' ? 'SELL' : 'BUY',
+      position.size
+    );
+
+    if (!realTrade) {
+      console.error(`❌ Failed to execute real trade for closing position ${position.symbol}`);
+      return false;
+    }
+
+    // Trade güncelle
+    originalTrade.exitPrice = realTrade.price;
+    originalTrade.profit = position.pnl;
+    originalTrade.closeTimestamp = closeTimestamp;
+    originalTrade.status = realTrade.status;
+  } else {
+    // Simülasyon modunda fiyatı ve kârı hesapla
+    const COMMISSION_RATE = 0.001;
+    const grossExit = position.size * position.currentPrice;
+    const exitFee = grossExit * COMMISSION_RATE;
+    const netExit = grossExit - exitFee;
+
+    // Güncelleme
+    originalTrade.exitPrice = position.currentPrice;
+    originalTrade.profit = position.pnl;
+    originalTrade.closeTimestamp = closeTimestamp;
+    originalTrade.status = 'FILLED';
+
+    this.portfolio.availableBalance += netExit;
+  }
+
+  // Learning servisine bildir
+  await learningService.recordPositionClose(position, originalTrade, reason);
+
+  // Adaptif stratejiye sonucu bildir
+  const marketData = await binanceService.getMarketData(position.symbol);
+  if (marketData) {
+    adaptiveStrategy.recordTradeOutcome(originalTrade, position, marketData);
+  }
+
+  // Pozisyonu sil
+  this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
+  this.activePositionIds.delete(position.symbol);
+  this.multiExitPositions.delete(position.id);
+
+  console.log(`✅ Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
+  return true;
+}
+
 
   private updatePortfolioMetrics() {
     const positionsValue = this.portfolio.positions.reduce((sum, pos) => sum + (pos.size * pos.currentPrice), 0);
