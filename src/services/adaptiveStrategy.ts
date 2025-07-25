@@ -1,4 +1,4 @@
-import { BotConfig,MarketData, Position, Trade } from '../types/trading';
+import { MarketData, Position, Trade } from '../types/trading';
 
 export interface MarketCondition {
   type: 'TRENDING_UP' | 'TRENDING_DOWN' | 'SIDEWAYS' | 'UNCERTAIN' | 'HIGH_VOLATILITY';
@@ -395,7 +395,7 @@ class AdaptiveStrategyService {
     }
 
     // Learn from profitable trades
-    if (isWin && position.pnlPercent > 2) {
+    if (isWin && position.pnlPercent > 1) {
       this.learnFromProfitableTrade(trade, position, marketData);
     }
 
