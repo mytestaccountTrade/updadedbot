@@ -33,7 +33,7 @@ export const Dashboard: React.FC = () => {
     const timeout = setTimeout(() => {
     fetchData();
     updateLearningStats();
-  }, 1000); // 300-500 ms arası genelde yeter
+  }, 300); // 300-500 ms arası genelde yeter
     const interval = setInterval(fetchData, 30000);
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
     
