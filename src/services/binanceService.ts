@@ -231,7 +231,7 @@ class BinanceService {
         !excluded.some(stable => ticker.symbol.startsWith(stable))
       )
       .sort((a: any, b: any) => parseFloat(b.volume) - parseFloat(a.volume)) // en yüksek hacimli coinleri öne al
-      .slice(0, 50)
+      .slice(0, 100)
       .map((ticker: any) => ({
         symbol: ticker.symbol,
         price: parseFloat(ticker.lastPrice),
