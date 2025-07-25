@@ -41,6 +41,7 @@ export const Dashboard: React.FC = () => {
     logService.info('configLoaded', {}, 'Dashboard initialized with saved bot configuration');
     
     return () => {
+      clearTimeout(timeout);
       clearInterval(interval);
       clearInterval(learningInterval);
     };
