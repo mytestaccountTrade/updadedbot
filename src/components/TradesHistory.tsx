@@ -105,7 +105,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
         >
-          {t('previous')}
+          {t('prev')}
         </button>
         <span className="text-sm text-gray-600">
           {t('page')} {currentPage} / {totalPages}
