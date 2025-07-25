@@ -268,7 +268,7 @@ class TradingBot {
 
   private async initializeWebSocketSubscriptions() {
     try {
-      const tradingPairs = await binanceService.getTradingPairs();
+      const tradingPairs = await binanceService.getTradingPairs(this.config.maxSymbolsToTrade);
       const topPairs = tradingPairs.slice(0, 100);
       
       for (const pair of topPairs) {
