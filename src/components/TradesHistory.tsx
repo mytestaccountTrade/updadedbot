@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Trade } from '../types/trading';
 import { formatDistanceToNow } from 'date-fns';
@@ -8,8 +8,11 @@ interface TradesHistoryProps {
   trades: Trade[];
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
   const { t } = useLanguage();
+  const [currentPage, setCurrentPage] = useState(1);
 
   if (trades.length === 0) {
     return (
@@ -21,6 +24,12 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
 
   const sortedTrades = [...trades].sort((a, b) => b.timestamp - a.timestamp);
 
+  const totalPages = Math.ceil(sortedTrades.length / ITEMS_PER_PAGE);
+  const paginatedTrades = sortedTrades.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -31,14 +40,14 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('side')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('type')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('quantity')}</th>
-              <th className="text-left py-3 px-4">{t('entryPrice')}</th>
-              <th className="text-left py-3 px-4">{t('exitPrice')}</th>
+            <th className="text-left py-3 px-4">{t('entryPrice')}</th>
+            <th className="text-left py-3 px-4">{t('exitPrice')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
           </tr>
         </thead>
         <tbody>
-          {sortedTrades.map((trade) => (
+          {paginatedTrades.map((trade) => (
             <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
               <td className="py-4 px-4 text-sm text-gray-500">
                 {formatDistanceToNow(new Date(trade.timestamp), { addSuffix: true })}
@@ -60,12 +69,12 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               </td>
               <td className="py-4 px-4 text-gray-900">{trade.type}</td>
               <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
-             <td className="py-4 px-4 text-gray-900">
-        {trade.price ? `$${trade.price.toFixed(6)}` : '-'}
-      </td>
-      <td className="py-4 px-4 text-gray-900">
-        {trade.exitPrice ? `$${trade.exitPrice.toFixed(6)}` : '-'}
-      </td>
+              <td className="py-4 px-4 text-gray-900">
+                {trade.price ? `$${trade.price.toFixed(6)}` : '-'}
+              </td>
+              <td className="py-4 px-4 text-gray-900">
+                {trade.exitPrice ? `$${trade.exitPrice.toFixed(6)}` : '-'}
+              </td>
               <td className="py-4 px-4">
                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                   trade.status === 'FILLED' 
@@ -88,6 +97,27 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
           ))}
         </tbody>
       </table>
+
+      {/* 🔽 Pagination Controls */}
+      <div className="flex justify-center items-center mt-4 space-x-4">
+        <button
+          className="px-3 py-1 border rounded disabled:opacity-50"
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          {t('previous')}
+        </button>
+        <span className="text-sm text-gray-600">
+          {t('page')} {currentPage} / {totalPages}
+        </span>
+        <button
+          className="px-3 py-1 border rounded disabled:opacity-50"
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+        >
+          {t('next')}
+        </button>
+      </div>
     </div>
   );
 };
