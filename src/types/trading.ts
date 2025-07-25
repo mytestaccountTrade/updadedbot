@@ -33,6 +33,7 @@ export interface Trade {
   closeTimestamp?: number;
   exitPrice?: number;
   profit?: number;
+  duration?: number; // saniye cinsinden
 }
 
 export interface Portfolio {
