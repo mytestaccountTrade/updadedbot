@@ -104,7 +104,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
                 {trade.profit !== undefined ? `$${trade.profit.toFixed(6)}` : '-'}
               </td>
               <td className="py-4 px-4 text-gray-700 text-sm">
-                {trade.duration !== undefined ? formatDuration(trade.duration, t) : '-'}
+                {trade.duration !== undefined ? formatDuration(trade.duration, t as (key: string) => string) : '-'}
               </td>
             </tr>
           ))}
