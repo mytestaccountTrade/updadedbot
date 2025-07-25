@@ -295,128 +295,104 @@ class TradingBot {
   }
 
   private async executeWebSocketFastLearning(marketData: MarketData) {
-    try {
-      const now = Date.now();
-      
-      // Minimum 500ms between trades to prevent spam
-      if (now - this.lastFastLearningTrade < 500) {
-        return;
-      }
-      
-      console.log(`⚡ WebSocket Fast Learning: ${marketData.symbol} - Price: $${marketData.price.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}`);
-      
-      // Skip if we already have a position in this symbol
-      if (this.activePositionIds.has(marketData.symbol)) {
-        return;
-      }
-      
-      // Skip if we're at max positions
-      // Aggressive mode: Allow up to 40 positions, normal mode: use configured max
-      const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
-      if (this.portfolio.positions.length >= maxPositions) {
-        return;
-      }
-      
-      // Get news for signal generation
-      const news = newsService.getLatestNews();
-      
-      // Generate trading signal
-      const signal = await newsService.generateTradingSignal(marketData.symbol, marketData, news);
-      
-      // Get learning insights
-      const learningInsights = await learningService.getMarketInsights();
-      
-      // Apply learning insights to improve decision making
-      const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
-      
-      // Apply adaptive strategy analysis
-      const adaptiveDecision = this.config.adaptiveStrategyEnabled 
-        ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
-        : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: this.config.enableAggressiveMode ? 1.5 : 1.0 } };
-      
-      // Log adaptive decision
-      if (this.config.adaptiveStrategyEnabled) {
-        logService.learning('adaptiveDecision', {
-          decision: adaptiveDecision.shouldTrade ? 'ALLOW' : 'BLOCK',
-          reason: adaptiveDecision.reason,
-          confidence: adaptiveDecision.confidence.toFixed(3),
-          threshold: this.config.confidenceThreshold.toFixed(3)
-        });
-      }
-      
-      if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
-        logService.warning('tradeBlocked', {
-          symbol: marketData.symbol,
-          reason: adaptiveDecision.reason
-        });
-        return;
-      }
-      
-      // Combine signals with adaptive confidence
-      const finalConfidence = (enhancedSignal.confidence + adaptiveDecision.confidence) / 2;
-      const finalSignal = {
-        ...enhancedSignal,
-        confidence: finalConfidence,
-        reasoning: `${enhancedSignal.reasoning} | ${adaptiveDecision.reason}`
-      };
-      
-      logService.info('signalEvaluation', {
+  try {
+    const now = Date.now();
+
+    // Minimum 500ms between trades to prevent spam
+    if (now - this.lastFastLearningTrade < 500) return;
+
+    console.log(`⚡ WebSocket Fast Learning: ${marketData.symbol} - Price: $${marketData.price.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}`);
+
+    // Skip if already in position
+    if (this.activePositionIds.has(marketData.symbol)) return;
+
+    // Skip if at max positions
+    const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
+    if (this.portfolio.positions.length >= maxPositions) return;
+
+    const news = newsService.getLatestNews();
+    const signal = await newsService.generateTradingSignal(marketData.symbol, marketData, news);
+    const learningInsights = await learningService.getMarketInsights();
+    const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
+
+    const adaptiveDecision = this.config.adaptiveStrategyEnabled 
+      ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
+      : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: this.config.enableAggressiveMode ? 1.5 : 1.0 } };
+
+    if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
+      logService.warning('tradeBlocked', {
         symbol: marketData.symbol,
-        action: enhancedSignal.action,
-        confidence: enhancedSignal.confidence.toFixed(3),
-        threshold: this.config.confidenceThreshold.toFixed(3)
+        reason: adaptiveDecision.reason
       });
-      
-      // Fast learning trading logic
-      const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
-      const randomTrade = Math.random() < 0.1; // 10% chance of random trade
-      
-      if (shouldTrade || randomTrade) {
-        let action = finalSignal.action;
-        
-        // If random trade, pick random action
-        if (randomTrade && !shouldTrade) {
-          action = Math.random() > 0.5 ? 'BUY' : 'SELL';
-          logService.learning('randomExplorationTrade', {
-            action,
-            symbol: marketData.symbol
-          });
-        }
-        
-        logService.learning('fastLearningTradeExecuted', {
-          action,
-          symbol: marketData.symbol,
-          confidence: enhancedSignal.confidence.toFixed(2)
-        });
-        await this.executeTrade(marketData.symbol, action, marketData, finalSignal, adaptiveDecision.strategy);
-        
-        this.fastLearningTradeCount++;
-        this.lastFastLearningTrade = now;
-        
-        // Log portfolio status
-        logService.info('portfolioStatus', {
-          positions: this.portfolio.positions.length,
-          totalValue: this.portfolio.totalValue.toFixed(2),
-          totalPnl: this.portfolio.totalPnl.toFixed(2)
-        });
-        
-        // Trigger learning every 3-5 trades (randomized)
-        const retrainInterval = 3 + Math.floor(Math.random() * 3); // 3-5 trades
-        if (this.fastLearningTradeCount % retrainInterval === 0) {
-          logService.learning('earlyRetraining', {
-            tradeCount: this.fastLearningTradeCount
-          });
-          await learningService.retrainModel();
-        }
-      }
-      
-    } catch (error) {
-      logService.error('fastLearningLoopError', { 
-        symbol: marketData.symbol, 
-        error: error instanceof Error ? error.message : String(error) 
-      }, `Fast learning loop error for ${marketData.symbol}`);
+      return;
     }
+
+    const finalConfidence = (enhancedSignal.confidence + adaptiveDecision.confidence) / 2;
+    const finalSignal = {
+      ...enhancedSignal,
+      confidence: finalConfidence,
+      reasoning: `${enhancedSignal.reasoning} | ${adaptiveDecision.reason}`
+    };
+
+    logService.info('signalEvaluation', {
+      symbol: marketData.symbol,
+      action: enhancedSignal.action,
+      confidence: enhancedSignal.confidence.toFixed(3),
+      threshold: this.config.confidenceThreshold.toFixed(3)
+    });
+
+    const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
+    const randomTrade = Math.random() < 0.1;
+
+    if (shouldTrade || randomTrade) {
+      let action = finalSignal.action;
+
+      if (randomTrade && !shouldTrade) {
+        action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+        logService.learning('randomExplorationTrade', {
+          action,
+          symbol: marketData.symbol
+        });
+      }
+
+      logService.learning('fastLearningTradeExecuted', {
+        action,
+        symbol: marketData.symbol,
+        confidence: enhancedSignal.confidence.toFixed(2)
+      });
+
+      await this.executeTrade(marketData.symbol, action, marketData, finalSignal, adaptiveDecision.strategy);
+
+      this.fastLearningTradeCount++;
+      this.lastFastLearningTrade = now;
+
+      // ✅ Update portfolio metrics here
+      this.updatePortfolioMetrics();
+
+      // 🔄 Log updated status
+      logService.info('portfolioStatus', {
+        positions: this.portfolio.positions.length,
+        totalValue: this.portfolio.totalValue.toFixed(2),
+        totalPnl: this.portfolio.totalPnl.toFixed(2),
+        availableBalance: this.portfolio.availableBalance.toFixed(2)
+      });
+
+      // 🤖 Trigger learning every 3–5 trades
+      const retrainInterval = 3 + Math.floor(Math.random() * 3);
+      if (this.fastLearningTradeCount % retrainInterval === 0) {
+        logService.learning('earlyRetraining', {
+          tradeCount: this.fastLearningTradeCount
+        });
+        await learningService.retrainModel();
+      }
+    }
+  } catch (error) {
+    logService.error('fastLearningLoopError', {
+      symbol: marketData.symbol,
+      error: error instanceof Error ? error.message : String(error)
+    }, `Fast learning loop error for ${marketData.symbol}`);
   }
+}
 
   private async syncRealPositions() {
     if (this.config.mode !== 'REAL') return;
