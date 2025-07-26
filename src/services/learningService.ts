@@ -1015,7 +1015,55 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       console.error('Failed to load learning insights:', error);
     }
   }
+private async downloadLearningInsightsAsJson() {
+  try {
+    let data: any;
 
+    if (this.db) {
+      const transaction = this.db.transaction(['insights'], 'readonly');
+      const store = transaction.objectStore('insights');
+      const request = store.get('insights');
+
+      return new Promise<void>((resolve, reject) => {
+        request.onsuccess = () => {
+          if (request.result) {
+            data = request.result;
+            this._triggerInsightDownload(data);
+            resolve();
+          } else {
+            console.warn('❌ IndexedDB içinde insight bulunamadı.');
+            reject();
+          }
+        };
+        request.onerror = () => {
+          console.error('❌ IndexedDB okuma hatası:', request.error);
+          reject();
+        };
+      });
+    } else {
+      const saved = localStorage.getItem('trading-bot-insights');
+      if (saved) {
+        data = JSON.parse(saved);
+        this._triggerInsightDownload(data);
+      } else {
+        console.warn('❌ localStorage içinde insight verisi yok.');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Insight verisi dışa aktarım hatası:', error);
+  }
+}
+
+private _triggerInsightDownload(data: any) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'insight_backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  console.log('✅ Insight yedeği indirildi.');
+}
   private async saveTradeHistoryToMongo() {
   try {
     const response = await fetch('http://localhost:4000/api/trades/bulk-save', {
