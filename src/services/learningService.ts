@@ -84,7 +84,7 @@ class LearningService {
   private lastLlama3Request: number = 0;
   private maxConcurrentLearningOps: number = 1;
   private activeLearningOps: number = 0;
-
+  private useMongoDB: boolean = true; // İstersen bunu config dosyasından da alabiliriz
   constructor() {
     this.initIndexedDB();
   }
@@ -914,6 +914,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async saveTradeHistory() {
+    if (this.useMongoDB) return await this.saveTradeHistoryToMongo();
     try {
       if (this.db) {
         const transaction = this.db.transaction(['trades'], 'readwrite');
@@ -934,6 +935,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async loadTradeHistory() {
+    if (this.useMongoDB) return await this.loadTradeHistoryFromMongo();
     try {
       if (this.db) {
         const transaction = this.db.transaction(['trades'], 'readonly');
@@ -958,6 +960,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async saveLearningInsights() {
+     if (this.useMongoDB) return await this.saveLearningInsightsToMongo();
     try {
       const data = {
         id: 'insights',
@@ -985,6 +988,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   private async loadLearningInsights() {
+    if (this.useMongoDB) return await this.loadLearningInsightsFromMongo();
     try {
       if (this.db) {
         const transaction = this.db.transaction(['insights'], 'readonly');
