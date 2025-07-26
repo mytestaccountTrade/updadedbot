@@ -1015,28 +1015,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       console.error('Failed to load learning insights:', error);
     }
   }
-  export function downloadLearningInsights(): void {
-  try {
-    const data = localStorage.getItem('trading-bot-insights');
-    if (!data) {
-      console.warn('❌ Insight verisi bulunamadı.');
-      return;
-    }
 
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'insight_backup.json';
-    a.click();
-
-    URL.revokeObjectURL(url);
-    console.log('✅ Insight verisi indirildi.');
-  } catch (error) {
-    console.error('❌ Insight verisi indirme hatası:', error);
-  }
-}
   private async saveTradeHistoryToMongo() {
   try {
     const response = await fetch('http://localhost:4000/api/trades/bulk-save', {
