@@ -84,7 +84,7 @@ class LearningService {
   private lastLlama3Request: number = 0;
   private maxConcurrentLearningOps: number = 1;
   private activeLearningOps: number = 0;
-  const API_URL = 'http://localhost:4000/api';
+  private API_URL = 'http://localhost:4000/api';
   constructor() {
     this.initIndexedDB();
   }
