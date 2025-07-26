@@ -1015,7 +1015,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       console.error('Failed to load learning insights:', error);
     }
   }
-private async downloadLearningInsightsAsJson() {
+ async downloadLearningInsightsAsJson() {
   try {
     let data: any;
 
