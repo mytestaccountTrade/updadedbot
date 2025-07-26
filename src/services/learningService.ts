@@ -1010,6 +1010,69 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     }
   }
 
+  private async saveTradeHistoryToMongo() {
+  try {
+    const response = await fetch('http://localhost:4000/api/trades/bulk-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this.tradeHistory),
+    });
+
+    if (!response.ok) throw new Error('Failed to save to Mongo');
+
+    console.log(`✅ ${this.tradeHistory.length} trades MongoDB'ye kaydedildi.`);
+  } catch (error) {
+    console.error('❌ MongoDB trade history kaydetme hatası:', error);
+  }
+}
+  private async loadTradeHistoryFromMongo() {
+  try {
+    const response = await fetch('http://localhost:4000/api/trades/all');
+    if (!response.ok) throw new Error('Failed to fetch from Mongo');
+
+    const data = await response.json();
+    this.tradeHistory = data || [];
+    console.log(`📚 MongoDB'den ${this.tradeHistory.length} trade yüklendi.`);
+  } catch (error) {
+    console.error('❌ MongoDB trade history yükleme hatası:', error);
+  }
+}
+private async saveLearningInsightsToMongo() {
+  const payload = {
+    insights: this.learningInsights,
+    lastUpdate: this.lastLearningUpdate
+  };
+
+  try {
+    const response = await fetch('http://localhost:4000/api/insights/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Failed to save insights to Mongo');
+    console.log(`🧠 MongoDB'ye learning insight kaydedildi.`);
+  } catch (error) {
+    console.error('❌ MongoDB learning insight kaydetme hatası:', error);
+  }
+}
+private async loadLearningInsightsFromMongo() {
+  try {
+    const response = await fetch('http://localhost:4000/api/insights/get');
+    if (!response.ok) throw new Error('Failed to load insights from Mongo');
+
+    const data = await response.json();
+    if (data) {
+      this.learningInsights = data.insights || {};
+      this.lastLearningUpdate = data.lastUpdate || 0;
+      console.log('🧠 MongoDB üzerinden learning insights yüklendi.');
+    }
+  } catch (error) {
+    console.error('❌ MongoDB learning insight yükleme hatası:', error);
+  }
+}
+
+
   // Public method to get training data for manual fine-tuning
   getTrainingDataset(): any {
     const saved = localStorage.getItem('trading-bot-training-data');
@@ -1064,6 +1127,8 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     // Save reset state and clear persistent storage
     this.saveTradeHistory();
     this.saveLearningInsights();
+    this.saveTradeHistoryToMongo();
+    this.saveLearningInsightsToMongo();
     
     logService.learning('learningServiceResetComplete', {}, 'Learning service reset complete');
   }
