@@ -113,7 +113,9 @@ class LearningService {
       request.onsuccess = (event) => {
         this.db = (event.target as IDBOpenDBRequest).result;
         this.loadTradeHistory();
+        this.loadTradeHistoryFromMongo();
         this.loadLearningInsights();
+        this.loadLearningInsightsFromMongo();
       };
       
       request.onerror = () => {
