@@ -931,6 +931,20 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     }
   }
 
+  async saveTradeRecord(trade: TradeRecord) {
+    try {
+      const response = await fetch(`${API_URL}/trades`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trade)
+      });
+
+      if (!response.ok) throw new Error('Failed to save trade');
+    } catch (err) {
+      console.error('❌ Failed to save trade to MongoDB', err);
+    }
+  }
+
   private async loadTradeHistory() {
     try {
       if (this.db) {
