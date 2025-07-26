@@ -160,8 +160,8 @@ export const Dashboard: React.FC = () => {
                 <Settings className="w-5 h-5" />
               </button>
               <button onClick={() => learningService.downloadLearningInsightsAsJson()}>
-  🧠 Insight Verisini JSON Olarak İndir
-</button>
+              🧠 Insight Verisini JSON Olarak İndir
+              </button>
               <button
                 onClick={handleStartStop}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
