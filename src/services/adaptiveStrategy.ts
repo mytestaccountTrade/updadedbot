@@ -653,6 +653,30 @@ private async loadAdaptiveDataFromMongo() {
     console.error('❌ Mongo adaptive load hatası:', error);
   }
 }
+  downloadAdaptiveDataAsJson() {
+  try {
+    const data = {
+      patterns: this.learnedPatterns,
+      riskMetrics: this.riskMetrics,
+      recentTrades: this.recentTrades,
+      tradeReflections: this.tradeReflections,
+      exportedAt: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'adaptive_data_backup.json';
+    a.click();
+
+    URL.revokeObjectURL(url);
+    console.log('✅ Adaptive strategy yedeği indirildi.');
+  } catch (error) {
+    console.error('❌ Adaptive verisi indirme hatası:', error);
+  }
+}
 
   resetLearning() {
     logService.learning('adaptiveStrategyReset', {}, 'Resetting adaptive strategy learning');
