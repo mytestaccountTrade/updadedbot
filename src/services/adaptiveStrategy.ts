@@ -50,6 +50,7 @@ export interface RiskMetrics {
 class AdaptiveStrategyService {
   private strategies: Map<string, TradingStrategy> = new Map();
   private learnedPatterns: TradePattern[] = [];
+  private useMongoDB: boolean = true;
   private riskMetrics: RiskMetrics = {
     recentWinRate: 0.5,
     consecutiveLosses: 0,
@@ -613,6 +614,43 @@ class AdaptiveStrategyService {
       console.error('Failed to load adaptive strategy data:', error);
     }
   }
+  private async saveAdaptiveDataToMongo() {
+  try {
+    const payload = {
+      patterns: this.learnedPatterns,
+      riskMetrics: this.riskMetrics,
+      recentTrades: this.recentTrades,
+      tradeReflections: this.tradeReflections
+    };
+
+    const response = await fetch('http://localhost:4000/api/adaptive/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error('API failed');
+    console.log(`✅ Adaptive strateji MongoDB'ye kaydedildi.`);
+  } catch (error) {
+    console.error('❌ Mongo adaptive save hatası:', error);
+  }
+}
+
+private async loadAdaptiveDataFromMongo() {
+  try {
+    const response = await fetch('http://localhost:4000/api/adaptive/get');
+    const data = await response.json();
+
+    this.learnedPatterns = data.patterns || [];
+    this.riskMetrics = data.riskMetrics || {};
+    this.recentTrades = data.recentTrades || [];
+    this.tradeReflections = data.tradeReflections || [];
+
+    console.log(`📦 Adaptive strateji MongoDB'den yüklendi.`);
+  } catch (error) {
+    console.error('❌ Mongo adaptive load hatası:', error);
+  }
+}
 
   resetLearning() {
     logService.learning('adaptiveStrategyReset', {}, 'Resetting adaptive strategy learning');
