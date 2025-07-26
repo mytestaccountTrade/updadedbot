@@ -84,7 +84,7 @@ class LearningService {
   private lastLlama3Request: number = 0;
   private maxConcurrentLearningOps: number = 1;
   private activeLearningOps: number = 0;
-  private useMongoDB: boolean = false; // İstersen bunu config dosyasından da alabiliriz
+  private useMongoDB: boolean = true; // İstersen bunu config dosyasından da alabiliriz
   constructor() {
     this.initIndexedDB();
   }
