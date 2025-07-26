@@ -50,7 +50,7 @@ export interface RiskMetrics {
 class AdaptiveStrategyService {
   private strategies: Map<string, TradingStrategy> = new Map();
   private learnedPatterns: TradePattern[] = [];
-  private useMongoDB: boolean = false;
+  private useMongoDB: boolean = true;
   private riskMetrics: RiskMetrics = {
     recentWinRate: 0.5,
     consecutiveLosses: 0,
