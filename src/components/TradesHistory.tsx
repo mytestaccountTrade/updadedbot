@@ -58,6 +58,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">{t('duration')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('positionSize')}</th>
           </tr>
         </thead>
         <tbody>
@@ -88,6 +89,9 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               </td>
               <td className="py-4 px-4 text-gray-900">
                 {trade.exitPrice ? `$${trade.exitPrice.toFixed(6)}` : '-'}
+              </td>
+              <td className="py-4 px-4 text-gray-900">
+              {trade.price ? `$${(trade.price * trade.quantity).toFixed(2)}` : '-'}
               </td>
               <td className="py-4 px-4">
                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
