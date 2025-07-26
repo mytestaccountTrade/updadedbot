@@ -585,6 +585,7 @@ class AdaptiveStrategyService {
   }
 
   private saveStoredData() {
+    if (this.useMongoDB) return this.saveAdaptiveDataToMongo();
     try {
       localStorage.setItem('adaptive-strategy-patterns', JSON.stringify(this.learnedPatterns));
       localStorage.setItem('adaptive-strategy-risk', JSON.stringify(this.riskMetrics));
@@ -596,6 +597,7 @@ class AdaptiveStrategyService {
   }
 
   private loadStoredData() {
+    if (this.useMongoDB) return this.loadAdaptiveDataFromMongo();
     try {
       const patterns = localStorage.getItem('adaptive-strategy-patterns');
       if (patterns) this.learnedPatterns = JSON.parse(patterns);
