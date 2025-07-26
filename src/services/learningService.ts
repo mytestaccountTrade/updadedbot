@@ -1058,7 +1058,9 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       lastLearningUpdate: new Date(this.lastLearningUpdate).toLocaleString()
     };
   }
-
+  getTradeHistory(): TradeRecord[] {
+    return this.tradeHistory;
+  }
   resetLearning() {
     logService.learning('learningServiceReset', {}, 'Resetting learning service');
     
