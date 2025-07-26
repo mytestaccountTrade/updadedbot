@@ -955,6 +955,20 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     }
   }
 
+  async loadTradeHistoryFromServer() {
+  try {
+    const response = await fetch('http://localhost:4000/api/trades/all');
+    if (!response.ok) throw new Error('Server response not OK');
+
+    const trades = await response.json();
+    this.tradeHistory = trades;
+    console.log('✅ Trade history loaded from server:', trades);
+  } catch (error) {
+    console.error('❌ Failed to load trade history:', error);
+  }
+}
+
+
   private async saveLearningInsights() {
     try {
       const data = {
