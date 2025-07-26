@@ -84,7 +84,7 @@ class LearningService {
   private lastLlama3Request: number = 0;
   private maxConcurrentLearningOps: number = 1;
   private activeLearningOps: number = 0;
-  private API_URL = 'http://localhost:4000/api';
+
   constructor() {
     this.initIndexedDB();
   }
@@ -405,7 +405,7 @@ Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why
 
       // Calculate success rate of holding vs exiting in similar conditions
       const holdingSuccessRate = similarTrades.filter(t => t.outcome === 'PROFIT').length / similarTrades.length;
-      
+       
       const prompt = `Position analysis:
 Symbol: ${position.symbol}
 Current P&L: ${position.pnlPercent.toFixed(2)}%
@@ -931,20 +931,6 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
     }
   }
 
-  async saveTradeRecord(trade: TradeRecord) {
-    try {
-      const response = await fetch(`${API_URL}/trades`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(trade)
-      });
-
-      if (!response.ok) throw new Error('Failed to save trade');
-    } catch (err) {
-      console.error('❌ Failed to save trade to MongoDB', err);
-    }
-  }
-
   private async loadTradeHistory() {
     try {
       if (this.db) {
@@ -968,18 +954,6 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       this.tradeHistory = [];
     }
   }
-
-  async loadTradeHistoryFromServer() {
-   try {
-      const response = await fetch(`${API_URL}/trades/all`);
-      if (!response.ok) throw new Error('Failed to fetch trades');
-      const data = await response.json();
-      this.tradeHistory = data;
-    } catch (err) {
-      console.error('❌ Failed to load trade history from MongoDB', err);
-    }
-  }
-
 
   private async saveLearningInsights() {
     try {
@@ -1058,9 +1032,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       lastLearningUpdate: new Date(this.lastLearningUpdate).toLocaleString()
     };
   }
-  getTradeHistory(): TradeRecord[] {
-    return this.tradeHistory;
-  }
+
   resetLearning() {
     logService.learning('learningServiceReset', {}, 'Resetting learning service');
     
