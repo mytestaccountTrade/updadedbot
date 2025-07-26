@@ -84,7 +84,7 @@ class LearningService {
   private lastLlama3Request: number = 0;
   private maxConcurrentLearningOps: number = 1;
   private activeLearningOps: number = 0;
-
+  const API_URL = 'http://localhost:4000/api';
   constructor() {
     this.initIndexedDB();
   }
@@ -956,17 +956,15 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
   }
 
   async loadTradeHistoryFromServer() {
-  try {
-    const response = await fetch('http://localhost:4000/api/trades/all');
-    if (!response.ok) throw new Error('Server response not OK');
-
-    const trades = await response.json();
-    this.tradeHistory = trades;
-    console.log('✅ Trade history loaded from server:', trades);
-  } catch (error) {
-    console.error('❌ Failed to load trade history:', error);
+   try {
+      const response = await fetch(`${API_URL}/trades/all`);
+      if (!response.ok) throw new Error('Failed to fetch trades');
+      const data = await response.json();
+      this.tradeHistory = data;
+    } catch (err) {
+      console.error('❌ Failed to load trade history from MongoDB', err);
+    }
   }
-}
 
 
   private async saveLearningInsights() {
