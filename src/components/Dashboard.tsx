@@ -159,7 +159,7 @@ export const Dashboard: React.FC = () => {
               >
                 <Settings className="w-5 h-5" />
               </button>
-             <button onClick={() => adaptiveStrategy.downloadAdaptiveDataAsJson()}>
+             <button onClick={() => learningService.downloadLearningInsightsAsJson()}>
             ⬇️ Adaptive Strategy Yedeğini İndir
             </button>
               <button
