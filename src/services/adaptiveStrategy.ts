@@ -636,7 +636,7 @@ class AdaptiveStrategyService {
   } catch (error) {
     console.error('❌ Mongo adaptive save hatası:', error);
   }
-}
+} 
 
 private async loadAdaptiveDataFromMongo() {
   try {
