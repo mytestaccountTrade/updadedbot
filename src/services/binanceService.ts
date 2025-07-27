@@ -34,6 +34,7 @@ class BinanceService {
   private reconnectAttempts: Map<string, number> = new Map();
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private tradeMode: 'spot' | 'futures' = 'futures';
   
   // Throttling and rate limiting
   private lastTradingPairsFetch: number = 0;
@@ -177,7 +178,13 @@ class BinanceService {
   }
 
   private async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
-    const requiresAuth = endpoint.includes('/api/v3/order') || endpoint.includes('/api/v3/account') || endpoint.includes('/api/v3/openOrders');
+    const requiresAuth =
+  endpoint.includes('/api/v3/order') ||
+  endpoint.includes('/api/v3/account') ||
+  endpoint.includes('/api/v3/openOrders') ||
+  endpoint.includes('/fapi/v1/order') ||
+  endpoint.includes('/fapi/v2/account') ||
+  endpoint.includes('/fapi/v1/openOrders');
     
     if (requiresAuth && !this.hasValidCredentials()) {
       throw new Error('API credentials not configured. Please set your Binance API key and secret in the settings.');
@@ -265,8 +272,40 @@ class BinanceService {
     return [];
   }
 }
+public setTradeMode(mode: 'spot' | 'futures'): void {
+    this.tradeMode = mode;
+  }
+private getEndpoint(pathMap: { spot: string; futures: string }): string {
+    return this.tradeMode === 'futures' ? pathMap.futures : pathMap.spot;
+  }
 
+  public async getMarketPrice(symbol: string): Promise<number> {
+  const endpoint = this.getEndpoint({
+    spot: '/api/v3/ticker/price',
+    futures: '/fapi/v1/ticker/price',
+  });
+  try {
+    const ticker: any = await this.makeRequest(endpoint, { symbol });
+    return parseFloat(ticker.price);
+  } catch (error) {
+    console.error(`Failed to fetch market price for ${symbol}:`, error);
+    return 0;
+  }
+}
+public async getBalance(): Promise<any> {
+  const endpoint = this.getEndpoint({
+    spot: '/api/v3/account',
+    futures: '/fapi/v2/account',
+  });
+  try {
+    return await this.makeRequest(endpoint);
+  } catch (error) {
+    console.error('Failed to fetch account balance:', error);
+    return null;
+  }
+}
 
+  
   subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
     if (this.wsConnections.has(symbol)) {
       console.log(`Already subscribed to ${symbol}`);
@@ -527,7 +566,11 @@ class BinanceService {
     }
 
     try {
-      const openOrders = await this.makeRequest('/api/v3/openOrders');
+      const endpoint = this.getEndpoint({
+  spot: '/api/v3/openOrders',
+  futures: '/fapi/v1/openOrders',
+});
+const openOrders = await this.makeRequest(endpoint);
       return openOrders || [];
     } catch (error) {
       console.error('Failed to fetch open positions:', error);
@@ -556,7 +599,11 @@ class BinanceService {
         params.timeInForce = 'GTC';
       }
 
-      const result = await this.makeRequest('/api/v3/order', params, 'POST');
+      const endpoint = this.getEndpoint({
+  spot: '/api/v3/order',
+  futures: '/fapi/v1/order',
+});
+const result = await this.makeRequest(endpoint, params, 'POST');
       
       return {
         id: result.orderId.toString(),
@@ -580,7 +627,12 @@ class BinanceService {
         throw new Error('API credentials not configured');
       }
 
-      const data = await this.makeRequest('/api/v3/account');
+      const data = await this.makeRequest(
+  this.getEndpoint({
+    spot: '/api/v3/account',
+    futures: '/fapi/v2/account',
+  })
+);
       
       let totalBalance = 0;
       if (data.balances) {
@@ -614,17 +666,22 @@ class BinanceService {
   }
 
   private async getCurrentPrice(symbol: string): Promise<number> {
-    try {
-      const cached = this.marketDataCache.get(symbol);
-      if (cached) return cached.price;
-      
-      const ticker = await this.makeRequest('/api/v3/ticker/price', { symbol });
-      return parseFloat(ticker.price);
-    } catch (error) {
-      console.error(`Failed to get price for ${symbol}:`, error);
-      return 0;
-    }
+  try {
+    const cached = this.marketDataCache.get(symbol);
+    if (cached) return cached.price;
+
+    // seçili moda göre doğru endpoint
+    const endpoint = this.getEndpoint({
+      spot: '/api/v3/ticker/price',
+      futures: '/fapi/v1/ticker/price',
+    });
+    const ticker = await this.makeRequest(endpoint, { symbol });
+    return parseFloat(ticker.price);
+  } catch (error) {
+    console.error(`Failed to get price for ${symbol}:`, error);
+    return 0;
   }
+}
 
   unsubscribeFromMarketData(symbol: string): void {
     const ws = this.wsConnections.get(symbol);
