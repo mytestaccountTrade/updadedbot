@@ -42,7 +42,7 @@ class TradingBot {
         const config = {
           mode: savedConfig.mode || 'SIMULATION',
           simulationBalance: savedConfig.simulationBalance || 10000,
-          tradeMode:savedConfig.tradeMode || futures,
+          tradeMode:savedConfig.tradeMode || 'futures',
           fastLearningMode: savedConfig.fastLearningMode || false,
           adaptiveStrategyEnabled: savedConfig.adaptiveStrategyEnabled !== undefined ? savedConfig.adaptiveStrategyEnabled : true,
           maxRiskPerTrade: savedConfig.maxRiskPerTrade || 0.05,
@@ -99,6 +99,7 @@ class TradingBot {
       simulationBalance: 10000,
       fastLearningMode: false,
       adaptiveStrategyEnabled: true,
+      tradeMode: 'futures',
       maxRiskPerTrade: 0.05,
       stopLossPercent: 0.03,
       takeProfitPercent: 0.06,
