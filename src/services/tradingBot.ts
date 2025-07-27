@@ -1271,7 +1271,7 @@ originalTrade.duration = duration;
       positions: [],
       trades: [],
     };
-    
+     
     // Clear all position tracking
     this.activePositionIds.clear();
     this.multiExitPositions.clear();
