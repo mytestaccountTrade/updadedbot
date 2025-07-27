@@ -53,6 +53,13 @@ export const translations = {
     // Settings
     botSettings: 'Bot Settings',
     tradingMode: 'Trading Mode',
+    tradingModeType: 'Trading Mode Type',
+    spotTrading: 'Spot Trading',
+    spotTradingDescription: 'Buy and hold assets without leverage',
+    futuresTrading: 'Futures Trading',
+    futuresTradingDescription: 'Trade long and short positions with leverage',
+    spotModeInfo: 'ℹ️ Spot mode: only BUY trades are allowed and no leverage is used.',
+    futuresModeInfo: '⚡ Futures mode: long and short trading with leverage is enabled.',
     simulation: 'Simulation',
     paperTradingFakeMoney: 'Paper trading with fake money',
     realTrading: 'Real Trading',
