@@ -47,15 +47,15 @@ class BinanceService {
   private requestQueue: Array<() => Promise<any>> = [];
 
   private cachedTradingPairs: TradingPair[] = [];
-
+  
   constructor() {
-    this.apiKey = '';
-    this.apiSecret = '';
-    this.baseUrl = '/binance-api';
-    this.testnetUrl = '/binance-testnet';
-    this.isTestnet = false;
-    this.initializeSymbols();
-  }
+  this.apiKey = '';
+  this.apiSecret = '';
+  this.baseUrl = 'https://api.binance.com'; // ✅ Düzenlendi
+  this.testnetUrl = 'https://testnet.binance.vision'; // ✅
+  this.isTestnet = false;
+  this.initializeSymbols();
+}
 
   setCredentials(apiKey: string, apiSecret: string, useTestnet: boolean = true) {
     this.apiKey = apiKey;
@@ -116,26 +116,33 @@ class BinanceService {
   }
 
   validateOrderQuantity(symbol: string, quantity: number): { valid: boolean; adjustedQty?: number; error?: string } {
-    const symbolInfo = this.getSymbolInfo(symbol);
-    if (!symbolInfo) {
-      return { valid: false, error: 'Invalid symbol' };
-    }
-
-    if (quantity < symbolInfo.minQty) {
-      return { valid: false, error: `Quantity below minimum: ${symbolInfo.minQty}` };
-    }
-
-    // Adjust quantity to step size
-    const adjustedQty = Math.floor(quantity / symbolInfo.stepSize) * symbolInfo.stepSize;
-    
-    // Check minimum notional value
-    const currentPrice = this.marketDataCache.get(symbol)?.price || 0;
-    if (adjustedQty * currentPrice < symbolInfo.minNotional) {
-      return { valid: false, error: `Order value below minimum notional: ${symbolInfo.minNotional}` };
-    }
-
-    return { valid: true, adjustedQty };
+  const symbolInfo = this.getSymbolInfo(symbol);
+  if (!symbolInfo) {
+    return { valid: false, error: 'Invalid symbol' };
   }
+
+  if (quantity < symbolInfo.minQty) {
+    return { valid: false, error: `Quantity below minimum: ${symbolInfo.minQty}` };
+  }
+
+  const adjustedQty = Math.floor(quantity / symbolInfo.stepSize) * symbolInfo.stepSize;
+
+  if (adjustedQty <= 0) {
+    return { valid: false, error: `Adjusted quantity too small: ${adjustedQty}` };
+  }
+
+  const currentPrice = this.marketDataCache.get(symbol)?.price;
+  if (!currentPrice || currentPrice <= 0) {
+    return { valid: false, error: `Invalid or missing market price for ${symbol}` };
+  }
+
+  if (adjustedQty * currentPrice < symbolInfo.minNotional) {
+    return { valid: false, error: `Order value below minimum notional: ${symbolInfo.minNotional}` };
+  }
+
+  return { valid: true, adjustedQty };
+}
+
 
   // Add method to bypass minNotional for aggressive mode
   validateOrderQuantityAggressive(symbol: string, quantity: number): { valid: boolean; adjustedQty?: number; error?: string } {
@@ -220,7 +227,17 @@ class BinanceService {
 
   try {
     this.lastTradingPairsFetch = now;
-    const data = await this.makeRequest('/api/v3/ticker/24hr');
+
+    // 🌐 Web mi Electron mu kontrolü
+    let data: any[];
+
+    if (typeof window !== 'undefined' && window.electronAPI?.getTradingPairs) {
+      const result = await window.electronAPI.getTradingPairs();
+      if (result.error) throw new Error(result.error);
+      data = result;
+    } else {
+      data = await this.makeRequest('/api/v3/ticker/24hr');
+    }
 
     const excluded = ['USDC', 'BUSD', 'TUSD', 'FDUSD', 'DAI', 'USDP'];
 
@@ -230,7 +247,7 @@ class BinanceService {
         this.isValidSymbol(ticker.symbol) &&
         !excluded.some(stable => ticker.symbol.startsWith(stable))
       )
-      .sort((a: any, b: any) => parseFloat(b.volume) - parseFloat(a.volume)) // en yüksek hacimli coinleri öne al
+      .sort((a: any, b: any) => parseFloat(b.volume) - parseFloat(a.volume))
       .slice(0, limit)
       .map((ticker: any) => ({
         symbol: ticker.symbol,
@@ -244,10 +261,11 @@ class BinanceService {
     this.cachedTradingPairs = pairs;
     return pairs;
   } catch (error) {
-    console.error('Failed to fetch trading pairs:', error);
+    console.error('❌ Failed to fetch trading pairs:', error);
     return [];
   }
 }
+
 
   subscribeToMarketData(symbol: string, onUpdate?: (data: MarketData) => void): void {
     if (this.wsConnections.has(symbol)) {
@@ -522,7 +540,7 @@ class BinanceService {
       // Validate symbol and quantity
       const validation = this.validateOrderQuantity(symbol, quantity);
       if (!validation.valid) {
-        console.error(`Order validation failed: ${validation.error}`);
+        console.error(`[❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error}`);
         return null;
       }
 

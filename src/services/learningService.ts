@@ -1,7 +1,7 @@
 import { Trade, Position, MarketData } from '../types/trading';
 import { logService } from './logService';
 
-interface TradeRecord {
+export interface TradeRecord {
   id: string;
   timestamp: number;
   symbol: string;
@@ -93,7 +93,9 @@ class LearningService {
     this.llama3Url = url;
     this.llama3Model = model;
   }
-
+  public getTradeHistory(): TradeRecord[] {
+  return [...this.tradeHistory]; // kopyası verilir, doğrudan değiştirilmesin diye
+}
   private async initIndexedDB() {
     try {
       const request = indexedDB.open('TradingBotDB', 1);

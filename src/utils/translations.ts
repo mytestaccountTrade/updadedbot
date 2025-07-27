@@ -203,7 +203,8 @@ export const translations = {
   minutes: "minutes",
   hours: "hours",
   days: "days",
-  positionSize: "Position Size"
+  positionSize: "Position Size",
+  tradeHistory:"Trade History"
   },
   tr: {
     // Header
@@ -409,7 +410,8 @@ maxSymbolsToTrade_description: 'Botun aynı anda takip edeceği maksimum coin sa
   minutes: "dakika",
   hours: "saat",
   days: "gün",
-  positionSize: "Pozisyon Büyüklüğü"
+  positionSize: "Pozisyon Büyüklüğü",
+  tradeHistory:"Ticaret Geçmişi"
   },
 };
 

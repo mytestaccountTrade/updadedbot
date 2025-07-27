@@ -12,14 +12,16 @@ import { TradesHistory } from './TradesHistory';
 import { BotSettings } from './BotSettings';
 import { LogPanel } from './LogPanel';
 import { useLanguage } from '../contexts/LanguageContext';
-import { learningService } from '../services/learningService';
+import { learningService,TradeRecord } from '../services/learningService';
 import { adaptiveStrategy } from '../services/adaptiveStrategy';
 import { logService } from '../services/logService';
 import { SimulationReplayPanel } from './SimulationReplayPanel';
+import TradeHistoryChart from './TradeHistoryChart';
 
 export const Dashboard: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const [portfolio, setPortfolio] = useState<Portfolio>(tradingBot.getPortfolio());
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>(learningService.getTradeHistory());
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -28,7 +30,10 @@ export const Dashboard: React.FC = () => {
   const [adaptiveStats, setAdaptiveStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'news' | 'logs'| 'replay'>('overview');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+  return localStorage.getItem('darkMode') === 'true';
+});
+
   useEffect(() => {
     const timeout = setTimeout(() => {
     fetchData();
@@ -36,7 +41,12 @@ export const Dashboard: React.FC = () => {
   }, 300); // 300-500 ms arası genelde yeter
     const interval = setInterval(fetchData, 30000);
     const learningInterval = setInterval(updateLearningStats, 60000); // Update every minute
-    
+     if (darkMode) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+  localStorage.setItem('darkMode', String(darkMode));
     // Initialize bot with saved settings
     logService.info('configLoaded', {}, 'Dashboard initialized with saved bot configuration');
     
@@ -45,7 +55,7 @@ export const Dashboard: React.FC = () => {
       clearInterval(interval);
       clearInterval(learningInterval);
     };
-  }, []);
+  }, [darkMode]);
 
   const fetchData = async () => {
     try {
@@ -62,10 +72,14 @@ export const Dashboard: React.FC = () => {
       setTradingPairs(pairs);
       setNews(newsData);
       setPortfolio(tradingBot.getPortfolio());
+      updateTradeHistory();
     } catch (error) {
       console.error('Failed to fetch data:', error);
     }
   };
+  const updateTradeHistory = () => {
+  setTradeHistory(learningService.getTradeHistory());
+};
 
   const updateLearningStats = () => {
     const stats = learningService.getLearningStats();
@@ -99,9 +113,9 @@ export const Dashboard: React.FC = () => {
   const config = tradingBot.getConfig();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
+   <div className="min-h-screen text-gray-900 bg-gray-50 dark:bg-[#121212] dark:text-gray-100">
+  {/* Header */}
+  <div className="bg-white shadow-sm border-b border-gray-200 dark:bg-card dark:border-gray-700">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -160,6 +174,21 @@ export const Dashboard: React.FC = () => {
                 <Settings className="w-5 h-5" />
               </button>
               <button
+  onClick={() => setDarkMode(!darkMode)}
+  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+  title={darkMode ? 'Light mode' : 'Dark mode'}
+>
+  {darkMode ? (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path d="M12 3v1m0 16v1m8.66-9H21m-17 0H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M12 5a7 7 0 000 14 7 7 0 000-14z" />
+    </svg>
+  ) : (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
+    </svg>
+  )}
+</button>
+              <button
                 onClick={handleStartStop}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                   isRunning
@@ -178,7 +207,7 @@ export const Dashboard: React.FC = () => {
       {/* Portfolio Stats */}
       <div className="px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white dark:bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('totalValue')}</p>
@@ -190,7 +219,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white dark:bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('totalPnL')}</p>
@@ -208,7 +237,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white dark:bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('availableBalance')}</p>
@@ -220,7 +249,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white dark:bg-card rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('activePositions')}</p>
@@ -261,17 +290,26 @@ export const Dashboard: React.FC = () => {
 
           <div className="p-6">
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('portfolioPerformance')}</h3>
-                  <PortfolioChart portfolio={portfolio} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('topTradingPairs')}</h3>
-                  <TradingPairsList pairs={tradingPairs.slice(0, 10)} onTradeExecuted={fetchData} />
-                </div>
-              </div>
-            )}
+  <div className="space-y-6">
+    {/* Üstte iki sütun */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('portfolioPerformance')}</h3>
+        <PortfolioChart portfolio={portfolio} />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('topTradingPairs')}</h3>
+        <TradingPairsList pairs={tradingPairs.slice(0, 10)} onTradeExecuted={fetchData} />
+      </div>
+    </div>
+
+    {/* Altta tek sıra (tam genişlik) */}
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('tradeHistory')}</h3>
+      <TradeHistoryChart trades={tradeHistory} />
+    </div>
+  </div>
+)}
             
             {activeTab === 'overview' && learningStats && (
               <div className="mt-6 space-y-4">

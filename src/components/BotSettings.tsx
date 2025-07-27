@@ -309,7 +309,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>50%</span>
+                  <span>10%</span>
                   <span>95%</span>
                 </div>
               </div>
@@ -685,7 +685,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
     <input
       type="range"
       min="10"
-      max="500"
+      max="100"
       step="10"
       value={formData.maxSymbolsToTrade || 100}
       onChange={(e) => handleChange('maxSymbolsToTrade', parseInt(e.target.value))}
@@ -693,7 +693,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
     />
     <div className="flex justify-between text-xs text-gray-500 mt-1">
       <span>10</span>
-      <span>500</span>
+      <span>100</span>
     </div>
     <p className="text-xs text-gray-500 mt-2">
       {t('maxSymbolsToTrade_description')}
@@ -738,7 +738,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               <input
                 type="range"
                 min="0.01"
-                max="0.1"
+                max="0.2"
                 step="0.001"
                 value={formData.maxRiskPerTrade}
                 onChange={(e) => handleChange('maxRiskPerTrade', parseFloat(e.target.value))}
@@ -746,7 +746,7 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>1%</span>
-                <span>10%</span>
+                <span>20%</span>
               </div>
             </div>
 

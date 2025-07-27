@@ -942,7 +942,10 @@ class TradingBot {
     if (this.config.mode === 'REAL') {
       // Execute real trade via Binance API
       const realTrade = await binanceService.placeTrade(symbol, action, quantity);
-      if (!realTrade) return;
+      if (!realTrade) {
+    console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
+    return;
+  }
       
       trade.id = realTrade.id;
       trade.price = realTrade.price;
