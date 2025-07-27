@@ -62,6 +62,7 @@ export interface Language {
 }
 export interface BotConfig {
   mode: 'SIMULATION' | 'REAL';
+  tradeMode: 'spot' | 'futures';
   simulationBalance: number;
   fastLearningMode: boolean;
   adaptiveStrategyEnabled: boolean;

@@ -161,6 +161,57 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
             )}
           </div>
 
+        {/* Trading Mode (Spot/Futures) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">{t('tradingModeType')}</label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => handleChange('tradeMode', 'spot')}
+              className={`p-4 rounded-lg border-2 transition-colors ${
+                formData.tradeMode === 'spot'
+                  ? 'border-green-500 bg-green-50 text-green-700'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className="text-left">
+                <div className="font-medium">{t('spotTrading')}</div>
+                <div className="text-sm text-gray-600">{t('spotTradingDescription')}</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleChange('tradeMode', 'futures')}
+              className={`p-4 rounded-lg border-2 transition-colors ${
+                formData.tradeMode === 'futures'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <div className="text-left">
+                <div className="font-medium">{t('futuresTrading')}</div>
+                <div className="text-sm text-gray-600">{t('futuresTradingDescription')}</div>
+              </div>
+            </button>
+          </div>
+          {formData.tradeMode === 'spot' && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-green-800">
+                  ℹ️ {t('spotModeInfo')}
+                </span>
+              </div>
+            </div>
+          )}
+          {formData.tradeMode === 'futures' && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-blue-800">
+                  ⚡ {t('futuresModeInfo')}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
           {/* Simulation Balance */}
           {formData.mode === 'SIMULATION' && (
             <div>

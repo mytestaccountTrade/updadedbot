@@ -260,6 +260,13 @@ export const translations = {
     // Settings
     botSettings: 'Bot Ayarları',
     tradingMode: 'İşlem Modu',
+    tradingModeType: 'İşlem Modu Türü',
+    spotTrading: 'Spot İşlem',
+    spotTradingDescription: 'Kaldıraç olmadan varlık alım ve tutma',
+    futuresTrading: 'Vadeli İşlem',
+    futuresTradingDescription: 'Kaldıraçlı işlem, uzun ve kısa pozisyonlar',
+    spotModeInfo: 'Spot modu: Sadece ALIM emirleri, kaldıraç yok, gerçek varlık sahipliği',
+    futuresModeInfo: 'Vadeli modu: Hem ALIM/SATIM, kaldıraç mevcut, marjin ticareti',
     simulation: 'Simülasyon',
     paperTradingFakeMoney: 'Sahte para ile kağıt ticaret',
     realTrading: 'Gerçek İşlem',
