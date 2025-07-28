@@ -408,9 +408,7 @@ class TradingBot {
 
       // ✅ Update portfolio metrics here
       this.updatePortfolioMetrics();
-       if(this.config.mode == "REAL") {
-      this.updateRealWalletBalance();
-    }
+      
 
       // 🔄 Log updated status
       logService.info('portfolioStatus', {
@@ -709,9 +707,7 @@ if (!matchedTrade) {
     }
 
     this.updatePortfolioMetrics();
-     if(this.config.mode == "REAL") {
-      this.updateRealWalletBalance();
-    }
+     
   } catch (error) {
     logService.error(
       'tradingLoopError',
