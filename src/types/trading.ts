@@ -10,13 +10,16 @@ export interface TradingPair {
 export interface Position {
   id: string;
   symbol: string;
-  side: 'LONG' | 'SHORT';
+  side: 'LONG' | 'SHORT';        // mevcut alan, dokunulmadı
   size: number;
   entryPrice: number;
   currentPrice: number;
   pnl: number;
   pnlPercent: number;
   timestamp: number;
+
+  // Yeni alan: spot veya futures konum tipini belirtir
+  positionType: 'SPOT' | 'LONG' | 'SHORT';
 }
 
 export interface Trade {
