@@ -638,7 +638,7 @@ public async getBalance(): Promise<any> {
 }
 
 
-  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
+  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number,reduceOnly: boolean = false): Promise<Trade | null> {
   try {
     const validation = this.validateOrderQuantity(symbol, quantity);
     if (!validation.valid) {
@@ -663,8 +663,8 @@ public async getBalance(): Promise<any> {
       type: price ? 'LIMIT' : 'MARKET',
       quantity: validation.adjustedQty!.toString(),
     };
-    if (this.tradeMode === 'futures') {
-      params.reduceOnly = true; // ✅ Sadece Futures için geçerli
+    if (this.tradeMode === 'futures' && reduceOnly) {
+      params.reduceOnly = true;
     }
     if (price) {
       params.price = price.toString();
