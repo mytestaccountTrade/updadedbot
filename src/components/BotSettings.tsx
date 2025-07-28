@@ -211,6 +211,27 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
             </div>
           )}
         </div>
+        {/* Leverage Slider – only visible in futures mode */}
+{formData.tradeMode === 'futures' && (
+  <div className="mt-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      {t('leverage')} (x{formData.leverage})
+    </label>
+    <input
+      type="range"
+      min="1"
+      max="50"
+      step="1"
+      value={formData.leverage}
+      onChange={(e) => handleChange('leverage', parseInt(e.target.value))}
+      className="w-full"
+    />
+    <div className="flex justify-between text-xs text-gray-500 mt-1">
+      <span>x1</span>
+      <span>x50</span>
+    </div>
+  </div>
+)}
 
           {/* Simulation Balance */}
           {formData.mode === 'SIMULATION' && (
