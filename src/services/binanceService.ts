@@ -602,10 +602,12 @@ public async getBalance(): Promise<any> {
   if (!this.hasValidCredentials()) return [];
 
   try {
-    if (this.tradeMode === 'futures') {
-      const endpoint = '/fapi/v2/account';
-      const result = await this.makeRequest(endpoint);
-      const positions = result.positions.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+    if (this.config.tradeMode === 'futures') {
+      const result = await this.makeRequest('/fapi/v2/account');
+      const positions = result.positions.filter((p: any) => {
+        const amt = parseFloat(p.positionAmt);
+        return !isNaN(amt) && amt !== 0;
+      });
 
       return positions.map((p: any) => ({
         symbol: p.symbol,
@@ -614,7 +616,6 @@ public async getBalance(): Promise<any> {
         side: parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT'
       }));
     } else {
-      // Spot için mevcut açık pozisyon API'si yok, boş dönebilir
       return [];
     }
   } catch (error) {
