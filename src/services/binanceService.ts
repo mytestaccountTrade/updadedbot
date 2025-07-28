@@ -641,7 +641,7 @@ const result = await this.makeRequest(endpoint, params, 'POST');
       
       let totalBalance = 0;
 
-if (this.config.tradeMode === 'futures') {
+if (this.tradeMode === 'futures') {
   for (const asset of data.assets) {
     const total = parseFloat(asset.walletBalance);
     if (asset.asset === 'USDT') {
