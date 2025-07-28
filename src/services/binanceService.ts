@@ -640,23 +640,34 @@ const result = await this.makeRequest(endpoint, params, 'POST');
 );
       
       let totalBalance = 0;
-      if (data.balances) {
-        for (const balance of data.balances) {
-          if (parseFloat(balance.free) > 0 || parseFloat(balance.locked) > 0) {
-            const total = parseFloat(balance.free) + parseFloat(balance.locked);
-            
-            if (balance.asset === 'USDT') {
-              totalBalance += total;
-            } else if (balance.asset === 'BTC') {
-              const btcPrice = await this.getCurrentPrice('BTCUSDT');
-              totalBalance += total * btcPrice;
-            } else if (balance.asset === 'ETH') {
-              const ethPrice = await this.getCurrentPrice('ETHUSDT');
-              totalBalance += total * ethPrice;
-            }
-          }
-        }
-      }
+
+if (this.config.tradeMode === 'futures') {
+  for (const asset of data.assets) {
+    const total = parseFloat(asset.walletBalance);
+    if (asset.asset === 'USDT') {
+      totalBalance += total;
+    } else if (asset.asset === 'BTC') {
+      const btcPrice = await this.getCurrentPrice('BTCUSDT');
+      totalBalance += total * btcPrice;
+    } else if (asset.asset === 'ETH') {
+      const ethPrice = await this.getCurrentPrice('ETHUSDT');
+      totalBalance += total * ethPrice;
+    }
+  }
+} else if (data.balances) {
+  for (const balance of data.balances) {
+    const total = parseFloat(balance.free) + parseFloat(balance.locked);
+    if (balance.asset === 'USDT') {
+      totalBalance += total;
+    } else if (balance.asset === 'BTC') {
+      const btcPrice = await this.getCurrentPrice('BTCUSDT');
+      totalBalance += total * btcPrice;
+    } else if (balance.asset === 'ETH') {
+      const ethPrice = await this.getCurrentPrice('ETHUSDT');
+      totalBalance += total * ethPrice;
+    }
+  }
+}
       
       return { totalWalletBalance: totalBalance };
     } catch (error) {
