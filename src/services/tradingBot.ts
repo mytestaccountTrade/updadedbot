@@ -434,40 +434,41 @@ class TradingBot {
     console.log(`🔄 Synced ${openPositions.length} real positions`);
 
     for (const pos of openPositions) {
-      const positionAmt = parseFloat(pos.positionAmt);
-      const size = Math.abs(positionAmt);
-      if (size <= 0) continue; // ⛔ Pozisyon kapalı
+  const rawPositionAmt = parseFloat(pos.positionAmt);
+  const size = Math.abs(rawPositionAmt);
+  if (!size || isNaN(size)) continue;
 
-      const id = `sync-${pos.symbol}-${Date.now()}`;
-      const entryPrice = parseFloat(pos.entryPrice);
-      const markPrice = parseFloat(pos.markPrice || entryPrice);
-      const side = positionAmt > 0 ? 'LONG' : 'SHORT';
+  const rawEntry = parseFloat(pos.entryPrice);
+  const rawMark = parseFloat(pos.markPrice || pos.entryPrice);
+  if (isNaN(rawEntry) || isNaN(rawMark)) continue;
 
-      // 📌 Aynı sembol zaten eklenmiş mi? Tekrar ekleme
-      if (this.activePositionIds.has(pos.symbol)) continue;
+  const entryPrice = rawEntry;
+  const markPrice = rawMark;
+  const side = rawPositionAmt > 0 ? 'LONG' : 'SHORT';
 
-      const entryNotional = entryPrice * size;
-      const lev = this.config.leverage ?? 1;
-      const marginUsed = entryNotional / lev;
-      const pnl = (markPrice - entryPrice) * size * (side === 'LONG' ? 1 : -1);
-      const pnlPercent = (pnl / marginUsed) * 100;
+  const entryNotional = entryPrice * size;
+  const lev = this.config.leverage ?? 1;
+  const marginUsed = lev > 0 ? entryNotional / lev : entryNotional;
 
-      const position: Position = {
-        id,
-        symbol: pos.symbol,
-        side,
-        size,
-        entryPrice,
-        currentPrice: markPrice,
-        positionType: side,
-        pnl,
-        pnlPercent,
-        timestamp: Date.now()
-      };
+  const pnl = (markPrice - entryPrice) * size * (side === 'LONG' ? 1 : -1);
+  const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
 
-      this.portfolio.positions.push(position);
-      this.activePositionIds.add(pos.symbol);
-    }
+  const position: Position = {
+    id: `sync-${pos.symbol}-${Date.now()}`,
+    symbol: pos.symbol,
+    side,
+    size,
+    entryPrice,
+    currentPrice: markPrice,
+    positionType: side,
+    pnl,
+    pnlPercent,
+    timestamp: Date.now()
+  };
+
+  this.portfolio.positions.push(position);
+  this.activePositionIds.add(pos.symbol);
+}
 
   } catch (error) {
     console.error('❌ Failed to sync real positions:', error);
