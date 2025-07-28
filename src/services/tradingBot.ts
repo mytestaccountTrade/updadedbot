@@ -1121,188 +1121,158 @@ private async checkMultiExitLevels(
     }
   }
 
-  private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
-    if (this.portfolio.positions.length >= (this.config.enableAggressiveMode ? 40 : this.config.maxPositions)) {
-  console.log(`⛔ Trade blocked: max position limit reached`);
-  return;
-}
-    if (this.config.tradeMode === 'spot' && action === 'SELL') {
+ private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
+  if (this.portfolio.positions.length >= (this.config.enableAggressiveMode ? 40 : this.config.maxPositions)) {
+    console.log(`⛔ Trade blocked: max position limit reached`);
+    return;
+  }
+
+  if (this.config.tradeMode === 'spot' && action === 'SELL') {
     logService.warning('Trade Block', {}, '❌ SELL trades are not allowed in spot mode.');
     return;
   }
-    // Prevent duplicate positions
-    if (this.activePositionIds.has(symbol)) {
-      console.log(`⚠️ Skipping ${symbol} - already have position`);
-      return;
-    }
-    
-    // Enhanced entry validation with market regime context
-    const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
-    const entryValidation = this.validateTradeEntry(symbol, action, marketData, marketCondition, signal);
-    if (!entryValidation.valid) {
-      console.log(`🚫 Entry blocked for ${symbol}: ${entryValidation.reason}`);
-      return;
-    }
-    
-    // Apply adaptive risk sizing
-    const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
-    const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
-    const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
-    const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
-    const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
-    
-    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
-    // Risk miktarını hesapla
-let riskAmount = this.portfolio.availableBalance *
-  this.config.maxRiskPerTrade *
-  finalRiskMultiplier;
 
-// Futures modunda kaldıraç uygula
-if (this.config.tradeMode === 'futures') {
-  const lev = this.config.leverage ?? 1;
-  riskAmount *= lev;
-}
-
-// Mevcut agresif mod çarpanı
-const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
-
-// Lot adedini hesapla
-const quantity = (riskAmount * riskMultiplier) / marketData.price;
-
-    
-    if (quantity * marketData.price > this.portfolio.availableBalance) {
-      console.log(`⚠️ Insufficient balance for ${symbol}: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
-      return;
-    }
-    
-    // Minimum trade validation
-    if (
-  this.config.tradeMode === 'spot' &&
-  quantity * marketData.price < 10
-) {
-  console.log(
-    `⚠️ Trade too small for ${symbol}: $${(
-      quantity * marketData.price
-    ).toFixed(2)} < $10 minimum`
-  );
-  return;
-}
-    
-    // Generate unique trade ID
-    const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const trade: Trade = {
-      id: tradeId,
-      symbol,
-      side: action,
-      type: 'MARKET',
-      quantity,
-      price: marketData.price,
-      status: 'PENDING',
-      timestamp: Date.now(),
-    };
-    
-    // Store trade context for learning
-    const tradeContext = {
-      marketData,
-      signal,
-      marketCondition,
-      newsContext: newsService.getLatestNews().filter(item => 
-        item.coins.includes(symbol.replace('USDT', ''))
-      ),
-      portfolioState: { ...this.portfolio }
-    };
-    
-    if (this.config.mode === 'REAL') {
-  // Execute real trade via Binance API
-  const realTrade = await binanceService.placeTrade(symbol, action, quantity);
-  if (!realTrade) {
-    console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
+  if (this.activePositionIds.has(symbol)) {
+    console.log(`⚠️ Skipping ${symbol} - already have position`);
     return;
   }
 
-  trade.id = realTrade.id;
-  trade.price = realTrade.price;
-  trade.status = realTrade.status;
-}
-
-// Her durumda trade.id'yi kullan
-this.portfolio.trades.push(trade);
-
-// Create position
-const positionType =
-  this.config.tradeMode === 'spot'
-    ? 'SPOT'
-    : action === 'BUY'
-    ? 'LONG'
-    : 'SHORT';
-
-const position: Position = {
-  id: trade.id, // ✅ Burayı düzelttik
-  symbol,
-  side: action === 'BUY' ? 'LONG' : 'SHORT',
-  size: quantity,
-  entryPrice: marketData.price,
-  currentPrice: marketData.price,
-  positionType,
-  pnl: 0,
-  pnlPercent: 0,
-  timestamp: Date.now(),
-};
-
-this.portfolio.positions.push(position);
-this.activePositionIds.add(symbol);
-    
-    // Set up multi-exit levels with market regime adjustments
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side, marketCondition);
-    this.multiExitPositions.set(position.id, {
-      tp1Hit: false,
-      tp2Hit: false,
-      trailingSL: exitLevels.sl
-    });
-    
-    // Log aggressive mode details if enabled
-    if (this.config.enableAggressiveMode) {
-      logService.info('aggressiveTradeExecuted', {
-        symbol,
-        action: trade.side,
-        positions: this.portfolio.positions.length,
-        maxPositions: 40,
-        profitTarget: '1-2%'
-      }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
-    }
-     // Komisyon oranları
-const COMMISSION_SPOT = 0.001;
-const COMMISSION_FUTURES = 0.0004;
-const FUNDING_ESTIMATE = 0.0001;
-
-// İşleme girme bedeli (notional)
-const entryCost = quantity * marketData.price;
-
-// Ücret (notional üzerinden hesaplanıyor)
-const totalFee = this.config.tradeMode === 'futures'
-  ? entryCost * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
-  : entryCost * COMMISSION_SPOT;
-
-// Futures modunda sadece teminat + ücret düşülecek, spot modunda tamamı
-let balanceDeduction: number;
-if (this.config.tradeMode === 'futures') {
-  const lev = this.config.leverage ?? 1;
-  const marginCost = lev > 0 ? entryCost / lev : entryCost;
-  balanceDeduction = marginCost + totalFee;
-} else {
-  balanceDeduction = entryCost + totalFee;
-}
-
-// Trade’i kaydet ve bakiyeden düş
-await learningService.recordTrade(trade, position, tradeContext);
-this.portfolio.availableBalance -= balanceDeduction;
-    
-    console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
-    console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
-    console.log(`   🎯 Exits: TP1=${exitLevels.tp1.toFixed(2)}, TP2=${exitLevels.tp2.toFixed(2)}, TP3=${exitLevels.tp3.toFixed(2)}, SL=${exitLevels.sl.toFixed(2)}`);
+  const marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
+  const entryValidation = this.validateTradeEntry(symbol, action, marketData, marketCondition, signal);
+  if (!entryValidation.valid) {
+    console.log(`🚫 Entry blocked for ${symbol}: ${entryValidation.reason}`);
+    return;
   }
 
+  // Risk hesaplamaları
+  const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
+  const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
+  const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
+  const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
+  const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
+
+  const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
+  let riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
+
+  if (this.config.tradeMode === 'futures') {
+    const lev = this.config.leverage ?? 1;
+    riskAmount *= lev;
+  }
+
+  const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
+  const quantity = (riskAmount * riskMultiplier) / marketData.price;
+
+  // Komisyon oranları
+  const COMMISSION_SPOT = 0.001;
+  const COMMISSION_FUTURES = 0.0004;
+  const FUNDING_ESTIMATE = 0.0001;
+
+  const entryCost = quantity * marketData.price;
+
+  let requiredBalance = 0;
+  if (this.config.tradeMode === 'futures') {
+    const lev = this.config.leverage ?? 1;
+    const marginCost = entryCost / lev;
+    const fee = entryCost * (COMMISSION_FUTURES + FUNDING_ESTIMATE);
+    requiredBalance = marginCost + fee;
+  } else {
+    const fee = entryCost * COMMISSION_SPOT;
+    requiredBalance = entryCost + fee;
+  }
+
+  if (requiredBalance > this.portfolio.availableBalance) {
+    console.log(`⚠️ Insufficient balance for ${symbol}: need $${requiredBalance.toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
+    return;
+  }
+
+  // Minimum işlem boyutu kontrolü
+  if (this.config.tradeMode === 'spot' && entryCost < 10) {
+    console.log(`⚠️ Trade too small for ${symbol}: $${entryCost.toFixed(2)} < $10 minimum`);
+    return;
+  }
+
+  // Trade ID oluştur
+  const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  const trade: Trade = {
+    id: tradeId,
+    symbol,
+    side: action,
+    type: 'MARKET',
+    quantity,
+    price: marketData.price,
+    status: 'PENDING',
+    timestamp: Date.now(),
+  };
+
+  const tradeContext = {
+    marketData,
+    signal,
+    marketCondition,
+    newsContext: newsService.getLatestNews().filter(item =>
+      item.coins.includes(symbol.replace('USDT', ''))
+    ),
+    portfolioState: { ...this.portfolio }
+  };
+
+  if (this.config.mode === 'REAL') {
+    const realTrade = await binanceService.placeTrade(symbol, action, quantity);
+    if (!realTrade) {
+      console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
+      return;
+    }
+
+    trade.id = realTrade.id;
+    trade.price = realTrade.price;
+    trade.status = realTrade.status;
+  }
+
+  this.portfolio.trades.push(trade);
+
+  const positionType = this.config.tradeMode === 'spot' ? 'SPOT' : (action === 'BUY' ? 'LONG' : 'SHORT');
+  const position: Position = {
+    id: trade.id,
+    symbol,
+    side: action === 'BUY' ? 'LONG' : 'SHORT',
+    size: quantity,
+    entryPrice: marketData.price,
+    currentPrice: marketData.price,
+    positionType,
+    pnl: 0,
+    pnlPercent: 0,
+    timestamp: Date.now(),
+  };
+
+  this.portfolio.positions.push(position);
+  this.activePositionIds.add(symbol);
+
+  const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side, marketCondition);
+  this.multiExitPositions.set(position.id, {
+    tp1Hit: false,
+    tp2Hit: false,
+    trailingSL: exitLevels.sl
+  });
+
+  if (this.config.enableAggressiveMode) {
+    logService.info('aggressiveTradeExecuted', {
+      symbol,
+      action: trade.side,
+      positions: this.portfolio.positions.length,
+      maxPositions: 40,
+      profitTarget: '1-2%'
+    }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
+  }
+
+  // Bakiyeden düş
+  this.portfolio.availableBalance -= requiredBalance;
+
+  await learningService.recordTrade(trade, position, tradeContext);
+
+  console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
+  console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
+  console.log(`   🎯 Exits: TP1=${exitLevels.tp1.toFixed(2)}, TP2=${exitLevels.tp2.toFixed(2)}, TP3=${exitLevels.tp3.toFixed(2)}, SL=${exitLevels.sl.toFixed(2)}`);
+}
+  
   private validateTradeEntry(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, marketCondition: any, signal?: any): { valid: boolean; reason: string } {
     const { rsi, macd, volumeRatio, emaTrend } = marketData;
     
