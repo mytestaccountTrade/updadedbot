@@ -1375,16 +1375,9 @@ this.portfolio.availableBalance -= balanceDeduction;
     originalTrade.exitPrice = realTrade.price;
     originalTrade.profit = position.pnl;
     originalTrade.closeTimestamp = closeTimestamp;
-     // 🎯 Uyumlu trade status ayarı
-  if (realTrade.status === 'FILLED' || realTrade.status === 'PARTIALLY_FILLED') {
-    originalTrade.status = 'FILLED';
-  } else if (realTrade.status === 'CANCELED' || realTrade.status === 'EXPIRED') {
-    originalTrade.status = 'CANCELLED';
-  } else {
-    originalTrade.status = 'PENDING'; // NEW, PARTIALLY_NEW gibi durumlar varsa
-  }
+    originalTrade.status = realTrade.status;
     const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
-originalTrade.duration = duration;
+    originalTrade.duration = duration;
   } else {
     // Simülasyon modunda fiyatı ve kârı hesapla
    // Çıkış işlemi ücret oranları
