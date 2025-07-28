@@ -603,18 +603,26 @@ public async getBalance(): Promise<any> {
 
   try {
     if (this.tradeMode === 'futures') {
-      const result = await this.makeRequest('/fapi/v2/account');
-      const positions = result.positions.filter((p: any) => {
-        const amt = parseFloat(p.positionAmt);
-        return !isNaN(amt) && amt !== 0;
-      });
+      const result = await this.makeRequest('/fapi/v2/positionRisk');
+      if (!Array.isArray(result)) return [];
 
-      return positions.map((p: any) => ({
-        symbol: p.symbol,
-        size: Math.abs(parseFloat(p.positionAmt)),
-        entryPrice: parseFloat(p.entryPrice),
-        side: parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT'
-      }));
+      return result
+        .filter((p: any) => {
+          const amt = parseFloat(p.positionAmt);
+          return !isNaN(amt) && amt !== 0;
+        })
+        .map((p: any) => {
+          const rawAmt = parseFloat(p.positionAmt);
+          return {
+            symbol: p.symbol,
+            size: Math.abs(rawAmt),
+            entryPrice: parseFloat(p.entryPrice),
+            currentPrice: parseFloat(p.markPrice), // 💡 markPrice bu endpoint'te doğrudan var
+            side: rawAmt > 0 ? 'LONG' : 'SHORT',
+            unrealizedProfit: parseFloat(p.unRealizedProfit),
+            leverage: parseFloat(p.leverage),
+          };
+        });
     } else {
       return [];
     }
@@ -623,6 +631,7 @@ public async getBalance(): Promise<any> {
     return [];
   }
 }
+
 
   async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
     try {
