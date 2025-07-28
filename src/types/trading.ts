@@ -72,6 +72,7 @@ export interface BotConfig {
   maxRiskPerTrade: number;
   stopLossPercent: number;
   takeProfitPercent: number;
+  leverage: number;              // <– Yeni alan
   maxPositions: number;
   maxSymbolsToTrade: number; // eklenecek alan
   enableNewsTrading: boolean;
