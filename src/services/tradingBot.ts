@@ -462,16 +462,30 @@ class TradingBot {
 
       const pnl = unrealizedProfit;
       const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
-      const matchedTrade = this.portfolio.trades.find(t =>
+      let matchedTrade = this.portfolio.trades.find(t =>
   t.symbol === symbol &&
-  t.side === (side === 'LONG' ? 'BUY' : 'SELL') && // 🔁 Dönüştür
+  t.side === (side === 'LONG' ? 'BUY' : 'SELL') &&
   !t.exitPrice &&
-  Math.abs(((t.price) - entryPrice) / entryPrice) < 0.03 // 🔁 %3 tolerans
+  Math.abs(((t.entryPrice ?? t.price) - entryPrice) / entryPrice) < 0.05
 );
 
 if (!matchedTrade) {
-  console.warn(`❌ No matched trade found for ${symbol} at entry ${entryPrice}. Skipping position sync.`);
-  continue;
+  console.warn(`⚠️ No matched trade found for ${symbol} at entry ${entryPrice}. Creating placeholder trade.`);
+  
+  // ✅ Sentetik trade oluştur
+  matchedTrade = {
+    id: `sync-${symbol}-${Date.now()}`,
+    symbol,
+    side: side === 'LONG' ? 'BUY' : 'SELL',
+    type: 'MARKET',
+    quantity: size,
+    price: entryPrice,
+    status: 'FILLED',
+    timestamp: Date.now(),
+    entryPrice: entryPrice
+  };
+
+  this.portfolio.trades.push(matchedTrade);
 }
       const position: Position = {
         id: `sync-${symbol}-${Date.now()}`,
