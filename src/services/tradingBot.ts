@@ -882,6 +882,10 @@ class TradingBot {
   }
 
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
+    if (this.config.tradeMode === 'spot' && action === 'SELL') {
+    logService.warn('❌ SELL trades are not allowed in spot mode.');
+    return;
+  }
     // Prevent duplicate positions
     if (this.activePositionIds.has(symbol)) {
       console.log(`⚠️ Skipping ${symbol} - already have position`);
@@ -961,17 +965,25 @@ class TradingBot {
     this.portfolio.trades.push(trade);
     
     // Create position
-    const position: Position = {
-      id: tradeId,
-      symbol,
-      side: action === 'BUY' ? 'LONG' : 'SHORT',
-      size: quantity,
-      entryPrice: marketData.price,
-      currentPrice: marketData.price,
-      pnl: 0,
-      pnlPercent: 0,
-      timestamp: Date.now(),
-    };
+    const positionType =
+  this.config.tradeMode === 'spot'
+    ? 'SPOT'
+    : action === 'BUY'
+    ? 'LONG'
+    : 'SHORT';
+
+const position: Position = {
+  id: tradeId,
+  symbol,
+  side: action === 'BUY' ? 'LONG' : 'SHORT',
+  size: quantity,
+  entryPrice: marketData.price,
+  currentPrice: marketData.price,
+  positionType,            // <– Yeni alan
+  pnl: 0,
+  pnlPercent: 0,
+  timestamp: Date.now(),
+};
     
     this.portfolio.positions.push(position);
     this.activePositionIds.add(symbol);
