@@ -35,6 +35,7 @@ class BinanceService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private tradeMode: 'spot' | 'futures' = 'futures';
+  private leverage:1;
   
   // Throttling and rate limiting
   private lastTradingPairsFetch: number = 0;
@@ -291,12 +292,14 @@ class BinanceService {
     return [];
   }
 }
-public setTradeMode(mode: 'spot' | 'futures'): void {
-    this.tradeMode = mode;
+public setTradeMode(mode: 'spot' | 'futures', leverage: number = 1): void {
+  this.tradeMode = mode;
   this.baseUrl = mode === 'futures'
     ? 'https://fapi.binance.com'
     : 'https://api.binance.com';
-  }
+
+  this.leverage = mode === 'futures' ? leverage : 1;
+}
 private getEndpoint(pathMap: { spot: string; futures: string }): string {
     return this.tradeMode === 'futures' ? pathMap.futures : pathMap.spot;
   }
