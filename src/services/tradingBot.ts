@@ -429,46 +429,46 @@ class TradingBot {
  private async syncRealPositions() {
   if (this.config.mode !== 'REAL' || this.config.tradeMode !== 'futures') return;
 
-  try {
-    const openPositions = await binanceService.getOpenPositions(); // ✔️ Bu artık doğru API'yi kullanıyor olmalı
+   try {
+    const openPositions = await binanceService.getOpenPositions();
     console.log(`🔄 Synced ${openPositions.length} real positions`);
 
     for (const pos of openPositions) {
-  const rawPositionAmt = parseFloat(pos.positionAmt);
-  const size = Math.abs(rawPositionAmt);
-  if (!size || isNaN(size)) continue;
+      const rawAmt = parseFloat(pos.positionAmt);
+      const entry = parseFloat(pos.entryPrice || '0');
+      const mark = parseFloat(pos.markPrice || pos.entryPrice || '0');
 
-  const rawEntry = parseFloat(pos.entryPrice);
-  const rawMark = parseFloat(pos.markPrice || pos.entryPrice);
-  if (isNaN(rawEntry) || isNaN(rawMark)) continue;
+      const size = Math.abs(rawAmt);
+      const side = rawAmt > 0 ? 'LONG' : rawAmt < 0 ? 'SHORT' : null;
 
-  const entryPrice = rawEntry;
-  const markPrice = rawMark;
-  const side = rawPositionAmt > 0 ? 'LONG' : 'SHORT';
+      if (!side || size === 0 || !entry || !mark || isNaN(size) || isNaN(entry) || isNaN(mark)) {
+        console.warn(`⚠️ Skipping position: symbol=${pos.symbol}, size=${rawAmt}, entry=${entry}, mark=${mark}`);
+        continue;
+      }
 
-  const entryNotional = entryPrice * size;
-  const lev = this.config.leverage ?? 1;
-  const marginUsed = lev > 0 ? entryNotional / lev : entryNotional;
+      const entryNotional = entry * size;
+      const lev = this.config.leverage ?? 1;
+      const marginUsed = lev > 0 ? entryNotional / lev : entryNotional;
 
-  const pnl = (markPrice - entryPrice) * size * (side === 'LONG' ? 1 : -1);
-  const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
+      const pnl = (mark - entry) * size * (side === 'LONG' ? 1 : -1);
+      const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
 
-  const position: Position = {
-    id: `sync-${pos.symbol}-${Date.now()}`,
-    symbol: pos.symbol,
-    side,
-    size,
-    entryPrice,
-    currentPrice: markPrice,
-    positionType: side,
-    pnl,
-    pnlPercent,
-    timestamp: Date.now()
-  };
+      const position: Position = {
+        id: `sync-${pos.symbol}-${Date.now()}`,
+        symbol: pos.symbol,
+        side,
+        size,
+        entryPrice: entry,
+        currentPrice: mark,
+        positionType: side,
+        pnl,
+        pnlPercent,
+        timestamp: Date.now()
+      };
 
-  this.portfolio.positions.push(position);
-  this.activePositionIds.add(pos.symbol);
-}
+      this.portfolio.positions.push(position);
+      this.activePositionIds.add(pos.symbol);
+    }
 
   } catch (error) {
     console.error('❌ Failed to sync real positions:', error);
