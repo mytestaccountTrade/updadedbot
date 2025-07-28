@@ -883,7 +883,7 @@ class TradingBot {
 
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
     if (this.config.tradeMode === 'spot' && action === 'SELL') {
-    logService.warn('❌ SELL trades are not allowed in spot mode.');
+    logService.warning('❌ SELL trades are not allowed in spot mode.');
     return;
   }
     // Prevent duplicate positions
