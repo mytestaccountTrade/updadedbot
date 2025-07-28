@@ -87,6 +87,15 @@ class TradingBot {
           // Aggressive mode settings
           enableAggressiveMode: savedConfig.enableAggressiveMode !== undefined ? savedConfig.enableAggressiveMode : false
         };
+        // ✅ Tam burada credentials set et
+      binanceService.setCredentials(
+        config.apiKey,
+        config.apiSecret,
+        config.mode === 'SIMULATION'
+      );
+
+      // ✅ Trade mode da set edilsin
+      binanceService.setTradeMode(config.tradeMode, config.leverage);
         return config;
       }
     } catch (error) {
@@ -143,6 +152,7 @@ class TradingBot {
       // Aggressive mode settings
       enableAggressiveMode: false
     };
+    
   }
 
   private saveConfig(): void {
