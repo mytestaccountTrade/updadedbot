@@ -1146,20 +1146,14 @@ private async checkMultiExitLevels(
     
     // Apply adaptive risk sizing
     const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
-const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
-const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
-const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
-const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
-
-const finalRiskMultiplier =
-  baseRiskMultiplier *
-  strategyRiskMultiplier *
-  adaptiveRiskMultiplier *
-  marketRiskMultiplier;
-
-// Risk miktarını hesapla
-let riskAmount =
-  this.portfolio.availableBalance *
+    const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
+    const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
+    const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
+    const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
+    
+    const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
+    // Risk miktarını hesapla
+let riskAmount = this.portfolio.availableBalance *
   this.config.maxRiskPerTrade *
   finalRiskMultiplier;
 
@@ -1169,30 +1163,17 @@ if (this.config.tradeMode === 'futures') {
   riskAmount *= lev;
 }
 
-// Agresif mod çarpanı uygula
+// Mevcut agresif mod çarpanı
 const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
+
+// Lot adedini hesapla
 const quantity = (riskAmount * riskMultiplier) / marketData.price;
 
-// ✅ Güncellenmiş bakiye kontrolü (Futures ve Spot ayrı ele alınıyor)
-const entryCost = quantity * marketData.price;
-
-if (this.config.tradeMode === 'futures') {
-  const lev = this.config.leverage ?? 1;
-  const marginCost = entryCost / lev;
-  const fee = entryCost * (COMMISSION_FUTURES + FUNDING_ESTIMATE);
-  const requiredBalance = marginCost + fee;
-
-  if (requiredBalance > this.portfolio.availableBalance) {
-    console.log(`⚠️ Insufficient futures margin for ${symbol}: need $${requiredBalance.toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
-    return;
-  }
-} else {
-  if (entryCost > this.portfolio.availableBalance) {
-    console.log(`⚠️ Insufficient spot balance for ${symbol}: need $${entryCost.toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
-    return;
-  }
-}
-
+    
+    if (quantity * marketData.price > this.portfolio.availableBalance) {
+      console.log(`⚠️ Insufficient balance for ${symbol}: need $${(quantity * marketData.price).toFixed(2)}, have $${this.portfolio.availableBalance.toFixed(2)}`);
+      return;
+    }
     
     // Minimum trade validation
     if (
