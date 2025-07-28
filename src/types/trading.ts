@@ -20,6 +20,7 @@ export interface Position {
 
   // Yeni alan: spot veya futures konum tipini belirtir
   positionType: 'SPOT' | 'LONG' | 'SHORT';
+  originTradeId?: string; // ✅ yeni alan
 }
 
 export interface Trade {
