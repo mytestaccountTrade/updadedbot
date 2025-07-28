@@ -31,15 +31,23 @@ class MultiStrategyService {
     symbol: string, 
     marketData: MarketData, 
     news: NewsItem[], 
-    enabledStrategies: any
+    enabledStrategies: any,
+    positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
+    leverage: number = 1
   ): Promise<StrategyResult[]> {
     const results: StrategyResult[] = [];
 
-    // Strategy A: RSI + MACD
-    if (enabledStrategies.rsiMacd.enabled) {
-      const rsiMacdResult = this.evaluateRsiMacdStrategy(marketData, enabledStrategies.rsiMacd.weight);
-      results.push(rsiMacdResult);
+    // RSI + MACD: spot modunda SELL sinyalleri önemsizleştir
+  if (enabledStrategies.rsiMacd.enabled) {
+    const rsiMacdResult = this.evaluateRsiMacdStrategy(marketData, enabledStrategies.rsiMacd.weight);
+    // Spot modunda SELL sinyali gelirse HOLD olarak işaretle
+    if (positionType === 'SPOT' && rsiMacdResult.action === 'SELL') {
+      rsiMacdResult.action = 'HOLD';
+      rsiMacdResult.confidence = 0;
+      rsiMacdResult.reasoning += ' (SELL skipped in spot mode)';
     }
+    results.push(rsiMacdResult);
+  }
 
     // Strategy B: News Sentiment + Llama3
     if (enabledStrategies.newsSentiment.enabled) {
@@ -49,9 +57,13 @@ class MultiStrategyService {
 
     // Strategy C: Volume Spike + Volatility
     if (enabledStrategies.volumeSpike.enabled) {
-      const volumeResult = this.evaluateVolumeSpikeStrategy(marketData, enabledStrategies.volumeSpike.weight);
-      results.push(volumeResult);
+    const volumeResult = this.evaluateVolumeSpikeStrategy(marketData, enabledStrategies.volumeSpike.weight);
+    // Futures işlemlerinde güveni hafifçe artır
+    if (positionType !== 'SPOT') {
+      volumeResult.confidence = Math.min(0.95, volumeResult.confidence * (1 + leverage * 0.02));
     }
+    results.push(volumeResult);
+  }
 
     return results;
   }
