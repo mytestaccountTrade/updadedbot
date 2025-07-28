@@ -1252,32 +1252,41 @@ this.portfolio.availableBalance += returnAmount;
 
 
   private updatePortfolioMetrics() {
-    const positionsValue = this.portfolio.positions.reduce((sum, pos) => sum + (pos.size * pos.currentPrice), 0);
-    
-    // Calculate total invested capital (what we paid for all positions)
-    const investedCapital = this.portfolio.positions.reduce((sum, pos) => sum + (pos.size * pos.entryPrice), 0);
-    
-    // Calculate unrealized P&L from active positions
-    const unrealizedPnl = this.portfolio.positions.reduce((sum, pos) => sum + pos.pnl, 0);
-    
-    // Calculate realized P&L from completed trades
-    const realizedPnl = this.portfolio.trades
-      .filter(trade => trade.profit !== undefined)
-      .reduce((sum, trade) => sum + (trade.profit || 0), 0);
-    
-    // Total P&L is unrealized + realized
-    const totalPnl = unrealizedPnl + realizedPnl;
-    
-    this.portfolio.totalValue = this.portfolio.availableBalance + positionsValue;
-    this.portfolio.totalPnl = totalPnl;
-    
-    // Calculate P&L percentage based on initial balance
-    const initialBalance = this.config.mode === 'SIMULATION' ? this.config.simulationBalance : 10000;
-    this.portfolio.totalPnlPercent = (totalPnl / initialBalance) * 100;
+     // Yatırılan teminat veya spot işlemlerde pozisyonun tam değeri
+  const invested = this.portfolio.positions.reduce((sum, pos) => {
+    if (this.config.tradeMode === 'futures') {
+      const notional = pos.size * pos.currentPrice;
+      const lev = this.config.leverage ?? 1;
+      return sum + (lev > 0 ? notional / lev : notional);
+    }
+    // Spot modunda tam tutar
+    return sum + (pos.size * pos.currentPrice);
+  }, 0);
+
+  // Gerçekleşmemiş kâr/zarar
+  const unrealizedPnl = this.portfolio.positions.reduce((sum, pos) => sum + pos.pnl, 0);
+
+  // Gerçekleşmiş kâr/zarar
+  const realizedPnl = this.portfolio.trades
+    .filter(trade => trade.profit !== undefined)
+    .reduce((sum, trade) => sum + (trade.profit || 0), 0);
+
+  // Toplam PnL
+  const totalPnl = unrealizedPnl + realizedPnl;
+
+  // Yeni portföy toplam değeri: eldeki bakiye + yatırılan teminat + unrealized PnL
+  this.portfolio.totalValue = this.portfolio.availableBalance + invested + unrealizedPnl;
+  this.portfolio.totalPnl = totalPnl;
+
+  // PnL yüzdesi değişmeden kalır
+  const initialBalance = this.config.mode === 'SIMULATION'
+    ? this.config.simulationBalance
+    : 10000;
+  this.portfolio.totalPnlPercent = (totalPnl / initialBalance) * 100;
     
     // Debug logging to help track the calculation
     if (this.portfolio.positions.length > 0) {
-      console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${positionsValue.toFixed(2)}, Invested: $${investedCapital.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
+     console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Notional: $${(notionalSum).toFixed(2)}, Invested: $${invested.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);ealized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
     }
   }
   
