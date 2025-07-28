@@ -59,7 +59,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onPos
                   ) : (
                     <TrendingDown className="w-3 h-3" />
                   )}
-                  <span>{t(position.side.toLowerCase() as any)}</span>
+                  <span>{t(position.positionType.toLowerCase() as any)}</span>
                 </span>
               </td>
               <td className="py-4 px-4 text-gray-900">{position.size.toFixed(6)}</td>
