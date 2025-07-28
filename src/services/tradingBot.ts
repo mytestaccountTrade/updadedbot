@@ -1009,6 +1009,10 @@ private async checkMultiExitLevels(
   }
 
   private async executeTrade(symbol: string, action: 'BUY' | 'SELL', marketData: MarketData, signal?: any, strategy?: any) {
+    if (this.portfolio.positions.length >= (this.config.enableAggressiveMode ? 40 : this.config.maxPositions)) {
+  console.log(`⛔ Trade blocked: max position limit reached`);
+  return;
+}
     if (this.config.tradeMode === 'spot' && action === 'SELL') {
     logService.warning('Trade Block', {}, '❌ SELL trades are not allowed in spot mode.');
     return;
@@ -1396,7 +1400,8 @@ this.portfolio.availableBalance += returnAmount;
     
     // Debug logging to help track the calculation
     if (this.portfolio.positions.length > 0) {
-       console.log('💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${invested.toFixed(2)}, Invested: $${invested.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}');
+      console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${invested.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
+
     }
   }
   
