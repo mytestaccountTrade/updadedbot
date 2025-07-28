@@ -177,7 +177,7 @@ class BinanceService {
     return this.isTestnet ? this.testnetUrl : this.baseUrl;
   }
 
-  private async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
+  public async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
     const requiresAuth =
   endpoint.includes('/api/v3/order') ||
   endpoint.includes('/api/v3/account') ||
