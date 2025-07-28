@@ -456,7 +456,7 @@ class TradingBot {
         size,
         entryPrice,
         currentPrice,
-        positionType: 'REAL_SYNC',
+        positionType: side,
         pnl: 0,
         pnlPercent: 0,
         timestamp: Date.now()
