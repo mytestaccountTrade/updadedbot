@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { Trade } from '../types/trading';
+import { Trade,BotConfig } from '../types/trading';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TradesHistoryProps {
   trades: Trade[];
 }
-
+const config = tradingBot.getConfig();
 const ITEMS_PER_PAGE = 10;
 
 // 🔧 Süreyi okunabilir formata çeviren yardımcı fonksiyon
@@ -87,7 +87,7 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               </td>
               <td className="py-4 px-4 text-gray-900">{trade.type}</td>
               <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
-              {trade.tradeMode === 'futures' ? (
+              {config.tradeMode === 'futures' ? (
   <>
     <td>{invested.toFixed(2)}</td>
     <td>{notional.toFixed(2)}</td>
