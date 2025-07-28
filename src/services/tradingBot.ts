@@ -658,7 +658,7 @@ class TradingBot {
       position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
       
       // Priority 1: Check multi-exit levels (highest priority)
-      const exitResult = this.checkMultiExitLevels(position, marketData.price);
+      const exitResult = await this.checkMultiExitLevels(position, marketData.price);
       if (exitResult.shouldExit) {
         console.log(`🎯 Multi-exit triggered for ${position.symbol}: ${exitResult.reason}`);
         await this.closePositionInternal(position, exitResult.reason);
@@ -817,18 +817,70 @@ class TradingBot {
   return { shouldExit: false, reason: '' };
 }
 
-  private checkMultiExitLevels(
+ private atrCache: Record<string, { value: number; timestamp: number }> = {};
+
+// 14-periyot ATR hesaplayıcı (gerçek ve simülasyon modlarına uygun)
+// Binance klines API’sinden veya yerel candle verilerinden veri çeker, sonucu 30 sn önbelleğe alır.
+private async calculateATR(symbol: string): Promise<number> {
+  const now = Date.now();
+  const cache = this.atrCache[symbol];
+  if (cache && now - cache.timestamp < 30_000) {
+    return cache.value;
+  }
+
+  try {
+    let candles: any[] = [];
+
+    if (this.config.mode === 'REAL') {
+      const endpoint =
+        this.config.tradeMode === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
+      const params = { symbol, interval: '1m', limit: 15 };
+      candles = await binanceService.makeRequest(endpoint, params);
+    } else {
+      const data =
+        (this as any).marketDataCache?.[symbol]?.candles || [];
+      candles = data.slice(-15);
+    }
+
+    if (!candles || candles.length < 2) {
+      return 0;
+    }
+
+    let atr = 0;
+    let prevClose = parseFloat(candles[0][4] ?? candles[0].close);
+    for (let i = 1; i < candles.length; i++) {
+      const candle = candles[i];
+      const high = parseFloat(candle[2] ?? candle.high);
+      const low = parseFloat(candle[3] ?? candle.low);
+      const close = parseFloat(candle[4] ?? candle.close);
+      const tr = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      atr += tr;
+      prevClose = close;
+    }
+    atr = atr / (candles.length - 1);
+
+    this.atrCache[symbol] = { value: atr, timestamp: now };
+    return atr;
+  } catch (error) {
+    console.error('ATR calculation error:', error);
+    return 0;
+  }
+}
+
+private async checkMultiExitLevels(
   position: Position,
   currentPrice: number
-): { shouldExit: boolean; reason: string } {
-  // Exit verilerini al veya oluştur
+): Promise<{ shouldExit: boolean; reason: string }> {
   let exitData: any = this.multiExitPositions.get(position.id);
   if (!exitData) {
     const exitLevels = adaptiveStrategy.getMultiExitLevels(
       position.entryPrice,
       position.side
     );
-    // peakPrice = giriş fiyatı, trailing henüz etkin değil
     exitData = {
       tp1Hit: false,
       tp2Hit: false,
@@ -846,7 +898,6 @@ class TradingBot {
   );
   const isLong = position.side === 'LONG';
 
-  // 1️⃣ Stop-loss kontrolü (her zaman öncelikli)
   if (
     (isLong && currentPrice <= exitData.trailingSL) ||
     (!isLong && currentPrice >= exitData.trailingSL)
@@ -854,39 +905,35 @@ class TradingBot {
     return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
   }
 
-  // 2️⃣ TP1 kontrolü
   if (!exitData.tp1Hit) {
     const tp1Hit =
       (isLong && currentPrice >= exitLevels.tp1) ||
       (!isLong && currentPrice <= exitLevels.tp1);
     if (tp1Hit) {
       exitData.tp1Hit = true;
-      // Breakeven’e taşın
       exitData.trailingSL = position.entryPrice;
       console.log(
-        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`
+        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(
+          2
+        )} - trailing SL moved to breakeven`
       );
       return { shouldExit: true, reason: 'TP1_REACHED' };
     }
-  }
-  // 3️⃣ TP2 kontrolü
-  else if (!exitData.tp2Hit) {
+  } else if (!exitData.tp2Hit) {
     const tp2Hit =
       (isLong && currentPrice >= exitLevels.tp2) ||
       (!isLong && currentPrice <= exitLevels.tp2);
     if (tp2Hit) {
       exitData.tp2Hit = true;
-      // SL’yi TP1 seviyesine taşı
       exitData.trailingSL = exitLevels.tp1;
       console.log(
-        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`
+        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(
+          2
+        )} - trailing SL moved to TP1`
       );
       return { shouldExit: true, reason: 'TP2_REACHED' };
     }
-  }
-  // 4️⃣ TP3 veya trailing stop kontrolü
-  else {
-    // Son TP hedefi – direkt çıkış
+  } else {
     const atTP3 =
       (isLong && currentPrice >= exitLevels.tp3) ||
       (!isLong && currentPrice <= exitLevels.tp3);
@@ -894,35 +941,39 @@ class TradingBot {
       return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
     }
 
-    // Trailing stop’u başlatmak için fiyattaki +2% eşiği (opsiyonel)
-    const startTrailPct = 0.02; // +2%
-    const trailStartTriggered =
+    const startTrailPct = 0.02;
+    const startTrail =
       exitData.trailActivated ||
-      (isLong &&
-        currentPrice >= exitLevels.tp2 * (1 + startTrailPct)) ||
-      (!isLong &&
-        currentPrice <= exitLevels.tp2 * (1 - startTrailPct));
+      (isLong && currentPrice >= exitLevels.tp2 * (1 + startTrailPct)) ||
+      (!isLong && currentPrice <= exitLevels.tp2 * (1 - startTrailPct));
 
-    if (trailStartTriggered) {
+    if (startTrail) {
       exitData.trailActivated = true;
 
-      // Favorable hareketlerde yeni zirveyi kaydet
       if (isLong) {
         exitData.peakPrice = Math.max(exitData.peakPrice, currentPrice);
       } else {
         exitData.peakPrice = Math.min(exitData.peakPrice, currentPrice);
       }
 
-      // Dinamik trailing mesafesi (ATR’ye göre ayarlanabilir, yoksa sabit)
-      const trailPct =
-        this.config.trailingStopPercent !== undefined
-          ? this.config.trailingStopPercent
-          : 0.015;
+      let trailDistance: number = 0;
+      let atrValue = 0;
+      const cached = this.atrCache[position.symbol];
+      if (cached) atrValue = cached.value;
+      this.calculateATR(position.symbol).catch(() => {});
 
-      // Zirve üzerinden trailing SL hesapla ve sadece iyileştir
+      const fallbackDist =
+        (this.config.trailingStopPercent || 0.015) * currentPrice;
+      trailDistance = Math.max(atrValue, fallbackDist);
+      console.log(
+        `Using ATR (${atrValue.toFixed(
+          4
+        )}) as trailing stop distance for ${position.symbol}`
+      );
+
       const proposedSL = isLong
-        ? exitData.peakPrice * (1 - trailPct)
-        : exitData.peakPrice * (1 + trailPct);
+        ? exitData.peakPrice - trailDistance
+        : exitData.peakPrice + trailDistance;
 
       if (
         (isLong && proposedSL > exitData.trailingSL) ||
