@@ -599,22 +599,29 @@ public async getBalance(): Promise<any> {
 }
 
   async getOpenPositions(): Promise<any[]> {
-    if (!this.hasValidCredentials()) {
-      return [];
-    }
+  if (!this.hasValidCredentials()) return [];
 
-    try {
-      const endpoint = this.getEndpoint({
-  spot: '/api/v3/openOrders',
-  futures: '/fapi/v1/openOrders',
-});
-const openOrders = await this.makeRequest(endpoint);
-      return openOrders || [];
-    } catch (error) {
-      console.error('Failed to fetch open positions:', error);
+  try {
+    if (this.tradeMode === 'futures') {
+      const endpoint = '/fapi/v2/account';
+      const result = await this.makeRequest(endpoint);
+      const positions = result.positions.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+
+      return positions.map((p: any) => ({
+        symbol: p.symbol,
+        size: Math.abs(parseFloat(p.positionAmt)),
+        entryPrice: parseFloat(p.entryPrice),
+        side: parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT'
+      }));
+    } else {
+      // Spot için mevcut açık pozisyon API'si yok, boş dönebilir
       return [];
     }
+  } catch (error) {
+    console.error('❌ Failed to fetch open positions:', error);
+    return [];
   }
+}
 
   async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
     try {
