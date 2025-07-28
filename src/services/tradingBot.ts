@@ -662,6 +662,18 @@ class TradingBot {
 }
 
   private async updatePositions() {
+     // 🔄 1. Real pozisyonlarla senkronize et
+  if (this.config.mode === 'REAL') {
+    const openPositions = await binanceService.getOpenPositions();
+    const openSymbols = new Set(openPositions.map(p => p.symbol));
+
+    for (const localPos of this.portfolio.positions) {
+      if (!openSymbols.has(localPos.symbol)) {
+        console.log(`🔁 Pozisyon kapalı ama hâlâ bekliyor: ${localPos.symbol}, kapatılıyor...`);
+        await this.closePositionInternal(localPos, 'SYNC: Binance closed');
+      }
+    }
+  }
     if (this.portfolio.positions.length === 0) return;
     
     console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
