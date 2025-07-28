@@ -602,30 +602,34 @@ public async getBalance(): Promise<any> {
   if (!this.hasValidCredentials()) return [];
 
   try {
-    if (this.tradeMode === 'futures') {
-      const result = await this.makeRequest('/fapi/v2/positionRisk');
-      if (!Array.isArray(result)) return [];
+    if (this.tradeMode !== 'futures') return [];
 
-      return result
-        .filter((p: any) => {
-          const amt = parseFloat(p.positionAmt);
-          return !isNaN(amt) && amt !== 0;
-        })
-        .map((p: any) => {
-          const rawAmt = parseFloat(p.positionAmt);
-          return {
-            symbol: p.symbol,
-            size: Math.abs(rawAmt),
-            entryPrice: parseFloat(p.entryPrice),
-            currentPrice: parseFloat(p.markPrice), // 💡 markPrice bu endpoint'te doğrudan var
-            side: rawAmt > 0 ? 'LONG' : 'SHORT',
-            unrealizedProfit: parseFloat(p.unRealizedProfit),
-            leverage: parseFloat(p.leverage),
-          };
-        });
-    } else {
-      return [];
-    }
+    const result = await this.makeRequest('/fapi/v2/positionRisk');
+    if (!Array.isArray(result)) return [];
+
+    return result
+      .filter((p: any) => {
+        const amt = parseFloat(p.positionAmt);
+        return !isNaN(amt) && amt !== 0;
+      })
+      .map((p: any) => {
+        const rawAmt = parseFloat(p.positionAmt);
+        const entry = parseFloat(p.entryPrice);
+        const mark = parseFloat(p.markPrice);
+        const leverage = parseFloat(p.leverage);
+        const unrealized = parseFloat(p.unRealizedProfit);
+
+        return {
+          symbol: p.symbol,
+          size: Math.abs(rawAmt),
+          entryPrice: entry,
+          currentPrice: mark,
+          side: rawAmt > 0 ? 'LONG' : 'SHORT',
+          unrealizedProfit: isNaN(unrealized) ? 0 : unrealized,
+          leverage: isNaN(leverage) ? 1 : leverage
+        };
+      });
+
   } catch (error) {
     console.error('❌ Failed to fetch open positions:', error);
     return [];
