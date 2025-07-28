@@ -1397,7 +1397,9 @@ this.portfolio.availableBalance -= balanceDeduction;
     const realTrade = await binanceService.placeTrade(
       position.symbol,
       position.side === 'LONG' ? 'SELL' : 'BUY',
-      position.size
+      position.size,
+      undefined,
+      true // ✅ reduceOnly
     );
 
     if (!realTrade) {
