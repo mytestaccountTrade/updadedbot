@@ -1206,14 +1206,6 @@ private async checkMultiExitLevels(
 
   if (this.config.mode === 'REAL') {
      // 🔐 Burası eklenecek yer:
-  if (this.config.tradeMode === 'futures') {
-    const futuresPos = await binanceService.getFuturesPosition(position.symbol);
-    const amt = parseFloat(futuresPos?.positionAmt ?? '0');
-    if (!futuresPos || amt === 0) {
-      console.warn(`⛔ Pozisyon zaten kapalı: ${position.symbol}. ReduceOnly order atlanacak.`);
-      return false;
-    }
-  }
     const realTrade = await binanceService.placeTrade(symbol, action, quantity);
     if (!realTrade) {
       console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
@@ -1375,7 +1367,16 @@ private async checkMultiExitLevels(
   }
 
   // Gerçek modda API ile satış yap
-  if (this.config.mode === 'REAL') {
+  if (this.config.mode === 'REAL') {  
+     // 🔐 Burası eklenecek yer:
+  if (this.config.tradeMode === 'futures') {
+    const futuresPos = await binanceService.getFuturesPosition(position.symbol);
+    const amt = parseFloat(futuresPos?.positionAmt ?? '0');
+    if (!futuresPos || amt === 0) {
+      console.warn(`⛔ Pozisyon zaten kapalı: ${position.symbol}. ReduceOnly order atlanacak.`);
+      return false;
+    }
+  }
     const realTrade = await binanceService.placeTrade(
       position.symbol,
       position.side === 'LONG' ? 'SELL' : 'BUY',
