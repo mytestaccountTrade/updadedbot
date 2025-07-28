@@ -155,7 +155,10 @@ class AdaptiveStrategyService {
     return { type, confidence, volatility, volume: volumeRatio, timeOfDay };
   }
 
-  selectOptimalStrategy(marketCondition: MarketCondition): TradingStrategy {
+  selectOptimalStrategy(
+  marketCondition: MarketCondition,
+  leverage: number = 1
+): TradingStrategy {
     const { type, timeOfDay } = marketCondition;
     
     // Time-based risk adjustment
@@ -198,7 +201,11 @@ class AdaptiveStrategyService {
 
     // Apply learned risk adjustments
     adjustedStrategy.riskMultiplier *= this.riskMetrics.currentRiskLevel;
-
+     // Kaldıraç arttıkça risk çarpanını azalt
+  if (leverage > 1) {
+    const reduction = Math.min(leverage * 0.1, 0.5); // örn. 10x kaldıraç = -1.0, ancak 0.5 sınırı var
+    adjustedStrategy.riskMultiplier = Math.max(0.1, adjustedStrategy.riskMultiplier - reduction);
+  }
     return adjustedStrategy;
   }
 
@@ -308,7 +315,12 @@ class AdaptiveStrategyService {
     );
   }
 
-  shouldTrade(marketData: MarketData, confidenceThreshold: number = 0.8): { shouldTrade: boolean; reason: string; confidence: number; strategy: TradingStrategy } {
+  shouldTrade(
+  marketData: MarketData,
+  confidenceThreshold: number = 0.8,
+  positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
+  leverage: number = 1
+): { shouldTrade: boolean; reason: string; confidence: number; strategy: TradingStrategy } {
     // Check cooldown
     if (Date.now() < this.riskMetrics.lastCooldownEnd) {
       return {
@@ -322,7 +334,15 @@ class AdaptiveStrategyService {
     const marketCondition = this.analyzeMarketCondition(marketData);
     const strategy = this.selectOptimalStrategy(marketCondition);
     const confidence = this.calculateSignalConfidence(marketData, marketCondition, confidenceThreshold);
-
+     // Kaldıraçlı (futures) işlemlerde minimum güven eşiğini yükselt
+  if (positionType !== 'SPOT' && confidence < 0.6) {
+    return {
+      shouldTrade: false,
+      reason: 'Too risky with leverage',
+      confidence,
+      strategy
+    };
+  }
     // Time-based restrictions
     if (marketCondition.timeOfDay === 'OVERNIGHT' && marketCondition.type === 'UNCERTAIN') {
       return {
@@ -513,8 +533,14 @@ class AdaptiveStrategyService {
     }
   }
 
-  getMultiExitLevels(entryPrice: number, side: 'LONG' | 'SHORT', marketCondition?: any): { tp1: number; tp2: number; tp3: number; sl: number } {
-    const multiplier = side === 'LONG' ? 1 : -1;
+  getMultiExitLevels(
+  entryPrice: number,
+  side: 'LONG' | 'SHORT',
+  marketCondition?: MarketCondition,
+  positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
+  leverage: number = 1
+): { tp1: number; tp2: number; tp3: number; sl: number } {
+  const multiplier = side === 'LONG' ? 1 : -1;
     
     // Base levels
     let tp1Pct = 0.01;   // 1%
@@ -564,12 +590,19 @@ class AdaptiveStrategyService {
       slPct *= volatilityMultiplier;
     }
     
-    return {
-      tp1: entryPrice * (1 + (tp1Pct * multiplier)),
-      tp2: entryPrice * (1 + (tp2Pct * multiplier)),
-      tp3: entryPrice * (1 + (tp3Pct * multiplier)),
-      sl: entryPrice * (1 - (slPct * multiplier))
-    };
+     let { tp1, tp2, tp3, sl } = {
+    tp1: entryPrice * (1 + (tp1Pct * multiplier)),
+    tp2: entryPrice * (1 + (tp2Pct * multiplier)),
+    tp3: entryPrice * (1 + (tp3Pct * multiplier)),
+    sl: entryPrice * (1 - (slPct * multiplier))
+  };
+
+  // Kaldıraçlı işlemlerde stop-loss’u sıkılaştır
+  if (positionType !== 'SPOT') {
+    sl *= 0.95;
+  }
+
+  return { tp1, tp2, tp3, sl };
   }
 
   getRiskMetrics(): RiskMetrics {
