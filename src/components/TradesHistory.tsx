@@ -63,6 +63,9 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
         </thead>
         <tbody>
           {paginatedTrades.map((trade) => (
+      const notional = trade.quantity * trade.price;
+  const leverage = trade.tradeMode === 'futures' ? config.leverage ?? 1 : 1;
+  const invested = notional / leverage;
             <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
               <td className="py-4 px-4 text-sm text-gray-500">
                 {formatDistanceToNow(new Date(trade.timestamp), { addSuffix: true })}
@@ -84,6 +87,17 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
               </td>
               <td className="py-4 px-4 text-gray-900">{trade.type}</td>
               <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
+              {trade.tradeMode === 'futures' ? (
+  <>
+    <td>{invested.toFixed(2)}</td>
+    <td>{notional.toFixed(2)}</td>
+  </>
+) : (
+  <>
+    <td>{notional.toFixed(2)}</td>
+    <td>-</td>
+  </>
+)}
               <td className="py-4 px-4 text-gray-900">
                 {trade.price ? `$${trade.price.toFixed(6)}` : '-'}
               </td>
