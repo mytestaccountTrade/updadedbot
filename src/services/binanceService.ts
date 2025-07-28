@@ -602,7 +602,7 @@ public async getBalance(): Promise<any> {
   if (!this.hasValidCredentials()) return [];
 
   try {
-    if (this.config.tradeMode === 'futures') {
+    if (this.tradeMode === 'futures') {
       const result = await this.makeRequest('/fapi/v2/account');
       const positions = result.positions.filter((p: any) => {
         const amt = parseFloat(p.positionAmt);
