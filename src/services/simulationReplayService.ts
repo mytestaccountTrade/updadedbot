@@ -55,10 +55,10 @@ class SimulationReplayService {
         // Execute trade if confidence is high enough
         if (combinedResult.action !== 'HOLD' && combinedResult.confidence > 0.6) {
           const tradeAmount = balance * 0.1; // 10% of balance per trade
-          // Pozisyon büyüklüğü (lot adedi)
-          const quantity = tradeAmount / entryPrice;
+          // Pozisyon büyüklüğü (lot adedi) 
           const entryPrice = currentData.price;
           const exitPrice = nextData.price;
+          const quantity = tradeAmount / entryPrice;
           
           let rawPnl: number;
   if (combinedResult.action === 'BUY') {
