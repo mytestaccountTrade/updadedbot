@@ -642,7 +642,7 @@ public async getBalance(): Promise<any> {
   try {
     const validation = this.validateOrderQuantity(symbol, quantity);
     if (!validation.valid) {
-      console.error([❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error});
+      console.error(`[❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error}`);
       return null;
     }
 
@@ -653,7 +653,7 @@ public async getBalance(): Promise<any> {
 
     const notional = price * validation.adjustedQty!;
     if (notional < 5) {
-      console.warn(❌ Order notional too small: ${notional.toFixed(2)} USDT. Skipping order.);
+      console.warn(`❌ Order notional too small: ${notional.toFixed(2)} USDT. Skipping order.`);
       return null;
     }
 
@@ -692,6 +692,7 @@ public async getBalance(): Promise<any> {
     return null;
   }
 }
+
 private mapBinanceStatus(rawStatus: string): 'FILLED' | 'PENDING' | 'CANCELLED' {
   if (rawStatus === 'FILLED') return 'FILLED';
   if (rawStatus === 'CANCELED' || rawStatus === 'EXPIRED' || rawStatus === 'REJECTED') return 'CANCELLED';
