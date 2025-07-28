@@ -1210,8 +1210,16 @@ const grossExit = position.size * position.currentPrice;
 const exitFee = this.config.tradeMode === 'futures'
   ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
   : grossExit * COMMISSION_SPOT;
-
+const entryNotional = position.size * position.entryPrice;
+const lev = this.config.leverage ?? 1;
+const marginDeposit = lev > 0 ? entryNotional / lev : entryNotional;
 const netExit = grossExit - exitFee;
+    let returnAmount;
+if (this.config.tradeMode === 'futures') {
+  returnAmount = marginDeposit + netExit - entryNotional;
+} else {
+  returnAmount = netExit;
+}
     // Güncelleme
     originalTrade.exitPrice = position.currentPrice;
     originalTrade.profit = position.pnl;
@@ -1220,7 +1228,8 @@ const netExit = grossExit - exitFee;
     const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
 originalTrade.duration = duration;
 
-    this.portfolio.availableBalance += netExit;
+   // Bu tutarı bakiyeye ekleyin
+this.portfolio.availableBalance += returnAmount;
   }
 
   // Learning servisine bildir
