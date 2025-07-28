@@ -817,68 +817,127 @@ class TradingBot {
   return { shouldExit: false, reason: '' };
 }
 
-  private checkMultiExitLevels(position: Position, currentPrice: number): { shouldExit: boolean; reason: string } {
-    const exitData = this.multiExitPositions.get(position.id);
-    if (!exitData) {
-      // Initialize if not exists
-      const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
-      this.multiExitPositions.set(position.id, {
-        tp1Hit: false,
-        tp2Hit: false,
-        trailingSL: exitLevels.sl
-      });
-      return { shouldExit: false, reason: '' };
-    }
-    
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(position.entryPrice, position.side);
-    const isLong = position.side === 'LONG';
-    
-    // Check stop loss first (highest priority)
-    if ((isLong && currentPrice <= exitData.trailingSL) || (!isLong && currentPrice >= exitData.trailingSL)) {
-      return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
-    }
-    
-    // Check take profit levels
-    if (!exitData.tp1Hit) {
-      if ((isLong && currentPrice >= exitLevels.tp1) || (!isLong && currentPrice <= exitLevels.tp1)) {
-        exitData.tp1Hit = true;
-        // Move trailing stop to breakeven
-        exitData.trailingSL = position.entryPrice;
-        console.log(`🎯 TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`);
-        
-        // Close 33% of position at TP1 (for now, close entire position)
-        return { shouldExit: true, reason: 'TP1_REACHED' };
-      }
-    } else if (!exitData.tp2Hit) {
-      if ((isLong && currentPrice >= exitLevels.tp2) || (!isLong && currentPrice <= exitLevels.tp2)) {
-        exitData.tp2Hit = true;
-        // Move trailing stop to TP1
-        exitData.trailingSL = exitLevels.tp1;
-        console.log(`🎯 TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`);
-        
-        // Close another 33% at TP2 (for now, close entire position)
-        return { shouldExit: true, reason: 'TP2_REACHED' };
-      }
-    } else {
-      // Both TP1 and TP2 hit, check TP3 for final exit
-      if ((isLong && currentPrice >= exitLevels.tp3) || (!isLong && currentPrice <= exitLevels.tp3)) {
-        return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
-      }
-      
-      // Update trailing stop if price moves favorably
-      const trailDistance = isLong ? 0.015 : -0.015; // 1.5% trail
-      const newTrailingSL = isLong 
-        ? Math.max(exitData.trailingSL, currentPrice * (1 - 0.015))
-        : Math.min(exitData.trailingSL, currentPrice * (1 + 0.015));
-      
-      if (newTrailingSL !== exitData.trailingSL) {
-        exitData.trailingSL = newTrailingSL;
-        console.log(`📈 Trailing stop updated for ${position.symbol}: ${newTrailingSL.toFixed(2)}`);
-      }
-    }
-    
+  private checkMultiExitLevels(
+  position: Position,
+  currentPrice: number
+): { shouldExit: boolean; reason: string } {
+  // Exit verilerini al veya oluştur
+  let exitData: any = this.multiExitPositions.get(position.id);
+  if (!exitData) {
+    const exitLevels = adaptiveStrategy.getMultiExitLevels(
+      position.entryPrice,
+      position.side
+    );
+    // peakPrice = giriş fiyatı, trailing henüz etkin değil
+    exitData = {
+      tp1Hit: false,
+      tp2Hit: false,
+      trailingSL: exitLevels.sl,
+      peakPrice: position.entryPrice,
+      trailActivated: false
+    };
+    this.multiExitPositions.set(position.id, exitData);
     return { shouldExit: false, reason: '' };
   }
+
+  const exitLevels = adaptiveStrategy.getMultiExitLevels(
+    position.entryPrice,
+    position.side
+  );
+  const isLong = position.side === 'LONG';
+
+  // 1️⃣ Stop-loss kontrolü (her zaman öncelikli)
+  if (
+    (isLong && currentPrice <= exitData.trailingSL) ||
+    (!isLong && currentPrice >= exitData.trailingSL)
+  ) {
+    return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
+  }
+
+  // 2️⃣ TP1 kontrolü
+  if (!exitData.tp1Hit) {
+    const tp1Hit =
+      (isLong && currentPrice >= exitLevels.tp1) ||
+      (!isLong && currentPrice <= exitLevels.tp1);
+    if (tp1Hit) {
+      exitData.tp1Hit = true;
+      // Breakeven’e taşın
+      exitData.trailingSL = position.entryPrice;
+      console.log(
+        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`
+      );
+      return { shouldExit: true, reason: 'TP1_REACHED' };
+    }
+  }
+  // 3️⃣ TP2 kontrolü
+  else if (!exitData.tp2Hit) {
+    const tp2Hit =
+      (isLong && currentPrice >= exitLevels.tp2) ||
+      (!isLong && currentPrice <= exitLevels.tp2);
+    if (tp2Hit) {
+      exitData.tp2Hit = true;
+      // SL’yi TP1 seviyesine taşı
+      exitData.trailingSL = exitLevels.tp1;
+      console.log(
+        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`
+      );
+      return { shouldExit: true, reason: 'TP2_REACHED' };
+    }
+  }
+  // 4️⃣ TP3 veya trailing stop kontrolü
+  else {
+    // Son TP hedefi – direkt çıkış
+    const atTP3 =
+      (isLong && currentPrice >= exitLevels.tp3) ||
+      (!isLong && currentPrice <= exitLevels.tp3);
+    if (atTP3) {
+      return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
+    }
+
+    // Trailing stop’u başlatmak için fiyattaki +2% eşiği (opsiyonel)
+    const startTrailPct = 0.02; // +2%
+    const trailStartTriggered =
+      exitData.trailActivated ||
+      (isLong &&
+        currentPrice >= exitLevels.tp2 * (1 + startTrailPct)) ||
+      (!isLong &&
+        currentPrice <= exitLevels.tp2 * (1 - startTrailPct));
+
+    if (trailStartTriggered) {
+      exitData.trailActivated = true;
+
+      // Favorable hareketlerde yeni zirveyi kaydet
+      if (isLong) {
+        exitData.peakPrice = Math.max(exitData.peakPrice, currentPrice);
+      } else {
+        exitData.peakPrice = Math.min(exitData.peakPrice, currentPrice);
+      }
+
+      // Dinamik trailing mesafesi (ATR’ye göre ayarlanabilir, yoksa sabit)
+      const trailPct =
+        this.config.trailingStopPercent !== undefined
+          ? this.config.trailingStopPercent
+          : 0.015;
+
+      // Zirve üzerinden trailing SL hesapla ve sadece iyileştir
+      const proposedSL = isLong
+        ? exitData.peakPrice * (1 - trailPct)
+        : exitData.peakPrice * (1 + trailPct);
+
+      if (
+        (isLong && proposedSL > exitData.trailingSL) ||
+        (!isLong && proposedSL < exitData.trailingSL)
+      ) {
+        exitData.trailingSL = proposedSL;
+        console.log(
+          ` Trailing stop updated for ${position.symbol}: ${proposedSL.toFixed(2)}`
+        );
+      }
+    }
+  }
+
+  return { shouldExit: false, reason: '' };
+}
 
   private async shouldExitBasedOnLearning(position: Position, marketData: MarketData): Promise<boolean> {
     try {
