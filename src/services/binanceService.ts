@@ -178,54 +178,61 @@ class BinanceService {
   }
 
 
-  public async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
-    const requiresAuth =
-  endpoint.includes('/api/v3/order') ||
-  endpoint.includes('/api/v3/account') ||
-  endpoint.includes('/api/v3/openOrders') ||
-  endpoint.includes('/fapi/v1/order') ||
-  endpoint.includes('/fapi/v2/account') ||
-  endpoint.includes('/fapi/v1/openOrders');
-    
-    if (requiresAuth && !this.hasValidCredentials()) {
-      throw new Error('API credentials not configured. Please set your Binance API key and secret in the settings.');
+  public async makeRequest(
+  endpoint: string,
+  params: any = {},
+  method: string = 'GET',
+  forceSpotBase: boolean = false
+): Promise<any> {
+  const requiresAuth =
+    endpoint.includes('/api/v3/order') ||
+    endpoint.includes('/api/v3/account') ||
+    endpoint.includes('/api/v3/openOrders') ||
+    endpoint.includes('/fapi/v1/order') ||
+    endpoint.includes('/fapi/v2/account') ||
+    endpoint.includes('/fapi/v1/openOrders');
+
+  if (requiresAuth && !this.hasValidCredentials()) {
+    throw new Error('API credentials not configured. Please set your Binance API key and secret in the settings.');
+  }
+
+  if (requiresAuth) {
+    params.timestamp = Date.now();
+    params.recvWindow = 5000;
+  }
+
+  // ✅ forceSpotBase olduğunda baseUrl sabitlenir
+  const base = forceSpotBase ? 'https://api.binance.com' : this.getBaseUrl();
+  const url = `${base}${endpoint}`;
+  const queryString = new URLSearchParams(params).toString();
+
+  let finalQueryString = queryString;
+  if (requiresAuth) {
+    const signature = CryptoJS.HmacSHA256(queryString, this.apiSecret).toString();
+    finalQueryString = `${queryString}&signature=${signature}`;
+  }
+
+  try {
+    const response = await fetch(`${url}?${finalQueryString}`, {
+      method,
+      headers: {
+        ...(requiresAuth && { 'X-MBX-APIKEY': this.apiKey }),
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Binance API error: ${response.statusText} - ${errorText}`);
     }
 
-    if (requiresAuth) {
-      params.timestamp = Date.now();
-      params.recvWindow = 5000;
-    }
-    
-    const url = `${this.getBaseUrl()}${endpoint}`;
-    const queryString = new URLSearchParams(params).toString();
-    
-    let finalQueryString = queryString;
-    if (requiresAuth) {
-      const signature = CryptoJS.HmacSHA256(queryString, this.apiSecret).toString();
-      finalQueryString = `${queryString}&signature=${signature}`;
-    }
-    
-    try {
-      const response = await fetch(`${url}?${finalQueryString}`, {
-        method,
-        headers: {
-          ...(requiresAuth && { 'X-MBX-APIKEY': this.apiKey }),
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' // 👈 Bunu EKLE
-        },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Binance API error: ${response.statusText} - ${errorText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Binance API request failed:', error);
-      throw error;
-    }
+    return await response.json();
+  } catch (error) {
+    console.error('Binance API request failed:', error);
+    throw error;
   }
+}
 
   async getTradingPairs(limit: number = 100): Promise<TradingPair[]> {
   const now = Date.now();
@@ -245,7 +252,7 @@ class BinanceService {
       if (result.error) throw new Error(result.error);
       data = result;
     } else {
-      data = await this.makeRequest('/api/v3/ticker/24hr');
+      data = await this.makeRequest('/api/v3/ticker/24hr', {}, 'GET', true); // 🔒 force spot base
     }
 
     const excluded = ['USDC', 'BUSD', 'TUSD', 'FDUSD', 'DAI', 'USDP'];
@@ -284,13 +291,15 @@ private getEndpoint(pathMap: { spot: string; futures: string }): string {
     return this.tradeMode === 'futures' ? pathMap.futures : pathMap.spot;
   }
 
-  public async getMarketPrice(symbol: string): Promise<number> {
+ public async getMarketPrice(symbol: string): Promise<number> {
   const endpoint = this.getEndpoint({
     spot: '/api/v3/ticker/price',
     futures: '/fapi/v1/ticker/price',
   });
+
   try {
-    const ticker: any = await this.makeRequest(endpoint, { symbol });
+    const forceSpot = endpoint === '/api/v3/ticker/price'; // spot endpoint ise zorla spot base URL kullan
+    const ticker: any = await this.makeRequest(endpoint, { symbol }, 'GET', forceSpot);
     return parseFloat(ticker.price);
   } catch (error) {
     console.error(`Failed to fetch market price for ${symbol}:`, error);
@@ -479,13 +488,13 @@ public async getBalance(): Promise<any> {
     try {
       // Batch requests with retry mechanism
       const [ticker, klines] = await Promise.all([
-        this.makeRequestWithRetry('/api/v3/ticker/24hr', { symbol }),
-        this.makeRequestWithRetry('/api/v3/klines', {
-          symbol,
-          interval: '1m',
-          limit: 50
-        })
-      ]);
+  this.makeRequestWithRetry('/api/v3/ticker/24hr', { symbol }, 'GET', true),
+  this.makeRequestWithRetry('/api/v3/klines', {
+    symbol,
+    interval: '1m',
+    limit: 50
+  }, 'GET', true)
+]);
 
       const prices = klines.map((k: any) => parseFloat(k[4]));
       const volumes = klines.map((k: any) => parseFloat(k[5]));
@@ -539,32 +548,37 @@ public async getBalance(): Promise<any> {
     }
   }
 
-  private async makeRequestWithRetry(endpoint: string, params: any = {}, maxRetries: number = 3): Promise<any> {
-    let lastError: Error;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Add exponential backoff delay for retries
-        if (attempt > 1) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          console.log(`🔄 Retry attempt ${attempt} for ${endpoint} after ${delay}ms delay`);
-        }
-        
-        return await this.makeRequest(endpoint, params);
-      } catch (error) {
-        lastError = error as Error;
-        console.warn(`Request failed (attempt ${attempt}/${maxRetries}):`, error);
-        
-        // Don't retry on certain errors
-        if (error instanceof Error && error.message.includes('Forbidden')) {
-          throw error;
-        }
+  private async makeRequestWithRetry(
+  endpoint: string,
+  params: any = {},
+  method: string = 'GET',
+  forceSpotBase: boolean = false,
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        console.log(`🔄 Retry attempt ${attempt} for ${endpoint} after ${delay}ms delay`);
+      }
+
+      return await this.makeRequest(endpoint, params, method, forceSpotBase);
+    } catch (error) {
+      lastError = error as Error;
+      console.warn(`Request failed (attempt ${attempt}/${maxRetries}):`, error);
+
+      if (error instanceof Error && error.message.includes('Forbidden')) {
+        throw error;
       }
     }
-    
-    throw lastError!;
   }
+
+  throw lastError!;
+}
+
   async getOpenPositions(): Promise<any[]> {
     if (!this.hasValidCredentials()) {
       return [];
