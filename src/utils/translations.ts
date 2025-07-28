@@ -147,6 +147,8 @@ export const translations = {
     filled: 'FILLED',
     pending: 'PENDING',
     cancelled: 'CANCELLED',
+    invested:'INVESTED',
+    notional:'Notional',
     
     // Volume
     volume: 'Vol',
@@ -260,6 +262,8 @@ export const translations = {
     status: 'Durum',
     profit: 'Kar',
     noTradesExecuted: 'Henüz işlem yapılmadı',
+    invested:'Gerçek Yatırım',
+    notional:'Pozisyon Büyüklüğü',
     
     // News
     cryptoNewsAnalysis: 'Kripto Haber Analizi',
