@@ -434,18 +434,42 @@ class TradingBot {
 }
 
   private async syncRealPositions() {
-    if (this.config.mode !== 'REAL') return;
-    
-    try {
-      const openPositions = await binanceService.getOpenPositions();
-      console.log(`🔄 Synced ${openPositions.length} real positions`);
-      
-      // Update portfolio with real positions
-      // This would need more complex logic to convert Binance orders to our Position format
-    } catch (error) {
-      console.error('Failed to sync real positions:', error);
+  if (this.config.mode !== 'REAL') return;
+
+  try {
+    const openPositions = await binanceService.getOpenPositions(); // ← Binance API'den geliyor
+    console.log(`🔄 Synced ${openPositions.length} real positions`);
+
+    for (const pos of openPositions) {
+      const id = `sync-${pos.symbol}-${Date.now()}`; // Eşsiz ID üret
+      const entryPrice = parseFloat(pos.entryPrice);
+      const currentPrice = parseFloat(pos.markPrice || pos.entryPrice);
+      const size = Math.abs(parseFloat(pos.positionAmt));
+      const side = parseFloat(pos.positionAmt) > 0 ? 'LONG' : 'SHORT';
+
+      if (size <= 0) continue; // Kapalı pozisyonları atla
+
+      const position: Position = {
+        id,
+        symbol: pos.symbol,
+        side,
+        size,
+        entryPrice,
+        currentPrice,
+        positionType: 'REAL_SYNC',
+        pnl: 0,
+        pnlPercent: 0,
+        timestamp: Date.now()
+      };
+
+      this.portfolio.positions.push(position);
+      this.activePositionIds.add(pos.symbol);
     }
+
+  } catch (error) {
+    console.error('❌ Failed to sync real positions:', error);
   }
+}
 
   private async runFastLearningLoop() {
     try {
@@ -1139,22 +1163,23 @@ const quantity = (riskAmount * riskMultiplier) / marketData.price;
     };
     
     if (this.config.mode === 'REAL') {
-      // Execute real trade via Binance API
-      const realTrade = await binanceService.placeTrade(symbol, action, quantity);
-      if (!realTrade) {
+  // Execute real trade via Binance API
+  const realTrade = await binanceService.placeTrade(symbol, action, quantity);
+  if (!realTrade) {
     console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
     return;
   }
-      
-      trade.id = realTrade.id;
-      trade.price = realTrade.price;
-      trade.status = realTrade.status;
-    }
-    
-    this.portfolio.trades.push(trade);
-    
-    // Create position
-    const positionType =
+
+  trade.id = realTrade.id;
+  trade.price = realTrade.price;
+  trade.status = realTrade.status;
+}
+
+// Her durumda trade.id'yi kullan
+this.portfolio.trades.push(trade);
+
+// Create position
+const positionType =
   this.config.tradeMode === 'spot'
     ? 'SPOT'
     : action === 'BUY'
@@ -1162,20 +1187,20 @@ const quantity = (riskAmount * riskMultiplier) / marketData.price;
     : 'SHORT';
 
 const position: Position = {
-  id: tradeId,
+  id: trade.id, // ✅ Burayı düzelttik
   symbol,
   side: action === 'BUY' ? 'LONG' : 'SHORT',
   size: quantity,
   entryPrice: marketData.price,
   currentPrice: marketData.price,
-  positionType,            // <– Yeni alan
+  positionType,
   pnl: 0,
   pnlPercent: 0,
   timestamp: Date.now(),
 };
-    
-    this.portfolio.positions.push(position);
-    this.activePositionIds.add(symbol);
+
+this.portfolio.positions.push(position);
+this.activePositionIds.add(symbol);
     
     // Set up multi-exit levels with market regime adjustments
     const exitLevels = adaptiveStrategy.getMultiExitLevels(marketData.price, position.side, marketCondition);
