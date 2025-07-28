@@ -817,7 +817,7 @@ class TradingBot {
   return { shouldExit: false, reason: '' };
 }
 private atrCache: Record<string, { value: number; timestamp: number }> = {};
-  // Binance klines API’sinden veya yerel candle verilerinden veri çeker, sonucu 30 sn önbelleğe alır.
+ 
 private async calculateATR(symbol: string): Promise<number> {
   const now = Date.now();
   const cache = this.atrCache[symbol];
