@@ -207,6 +207,7 @@ class BinanceService {
     endpoint.includes('/api/v3/openOrders') ||
     endpoint.includes('/fapi/v1/order') ||
     endpoint.includes('/fapi/v2/account') ||
+    endpoint.includes('/fapi/v2/positionRisk') ||
     endpoint.includes('/fapi/v1/openOrders');
 
   if (requiresAuth && !this.hasValidCredentials()) {
