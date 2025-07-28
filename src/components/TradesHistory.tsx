@@ -18,9 +18,9 @@ function formatDuration(seconds: number): string {
   const s = seconds % 60;
 
   const parts = [];
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0 || h > 0) parts.push(`${m}m`);
-  parts.push(`${s}s`);
+  if (h > 0) parts.push(${h}h);
+  if (m > 0 || h > 0) parts.push(${m}m);
+  parts.push(${s}s);
 
   return parts.join(' ');
 }
@@ -39,7 +39,34 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
 
   const sortedTrades = [...trades].sort((a, b) => b.timestamp - a.timestamp);
   const totalPages = Math.ceil(sortedTrades.length / ITEMS_PER_PAGE);
-  {paginatedTrades.map((trade) => {
+  const notional = trade.quantity * trade.price;
+  const leverage = trade.tradeMode === 'futures' ? config.leverage ?? 1 : 1;
+  const invested = notional / leverage;
+  const paginatedTrades = sortedTrades.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('time')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('symbol')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('side')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('type')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('quantity')}</th>
+            <th className="text-left py-3 px-4">{t('entryPrice')}</th>
+            <th className="text-left py-3 px-4">{t('exitPrice')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('positionSize')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('duration')}</th>    
+          </tr>
+        </thead>
+        <tbody>
+          {paginatedTrades.map((trade) => {
   const notional = trade.quantity * trade.price;
   const leverage = trade.tradeMode === 'futures' ? config.leverage ?? 1 : 1;
   const invested = notional / leverage;
