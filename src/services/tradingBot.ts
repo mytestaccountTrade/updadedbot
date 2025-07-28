@@ -1043,18 +1043,32 @@ const position: Position = {
         profitTarget: '1-2%'
       }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
     }
-     const COMMISSION_SPOT = 0.001;
+     // Komisyon oranları
+const COMMISSION_SPOT = 0.001;
 const COMMISSION_FUTURES = 0.0004;
 const FUNDING_ESTIMATE = 0.0001;
 
+// İşleme girme bedeli (notional)
 const entryCost = quantity * marketData.price;
 
+// Ücret (notional üzerinden hesaplanıyor)
 const totalFee = this.config.tradeMode === 'futures'
   ? entryCost * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
   : entryCost * COMMISSION_SPOT;
-    // Record trade for learning
-    await learningService.recordTrade(trade, position, tradeContext);
-    this.portfolio.availableBalance -= entryCost + totalFee;
+
+// Futures modunda sadece teminat + ücret düşülecek, spot modunda tamamı
+let balanceDeduction: number;
+if (this.config.tradeMode === 'futures') {
+  const lev = this.config.leverage ?? 1;
+  const marginCost = lev > 0 ? entryCost / lev : entryCost;
+  balanceDeduction = marginCost + totalFee;
+} else {
+  balanceDeduction = entryCost + totalFee;
+}
+
+// Trade’i kaydet ve bakiyeden düş
+await learningService.recordTrade(trade, position, tradeContext);
+this.portfolio.availableBalance -= balanceDeduction;
     
     console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
     console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
@@ -1193,12 +1207,10 @@ const FUNDING_ESTIMATE = 0.0001;     // İsteğe bağlı fonlama tahmini (%0.01)
 const grossExit = position.size * position.currentPrice;
 
 // Ücreti mod bazında hesapla
-const exitFee =
-  this.config.tradeMode === 'futures'
-    ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
-    : grossExit * COMMISSION_SPOT;
+const exitFee = this.config.tradeMode === 'futures'
+  ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
+  : grossExit * COMMISSION_SPOT;
 
-// Net çıkış (brüt – ücret)
 const netExit = grossExit - exitFee;
     // Güncelleme
     originalTrade.exitPrice = position.currentPrice;
