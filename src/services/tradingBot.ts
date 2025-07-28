@@ -1286,7 +1286,7 @@ this.portfolio.availableBalance += returnAmount;
     
     // Debug logging to help track the calculation
     if (this.portfolio.positions.length > 0) {
-     console.log(`💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Notional: $${(notionalSum).toFixed(2)}, Invested: $${invested.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);ealized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)}`);
+       console.log(💰 Portfolio Debug: Available: $${this.portfolio.availableBalance.toFixed(2)}, Positions Value: $${invested.toFixed(2)}, Invested: $${invested.toFixed(2)}, Unrealized P&L: $${unrealizedPnl.toFixed(2)}, Realized P&L: $${realizedPnl.toFixed(2)}, Total P&L: $${totalPnl.toFixed(2)});
     }
   }
   
