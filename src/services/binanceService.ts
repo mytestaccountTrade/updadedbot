@@ -663,7 +663,9 @@ public async getBalance(): Promise<any> {
       type: price ? 'LIMIT' : 'MARKET',
       quantity: validation.adjustedQty!.toString(),
     };
-
+    if (this.tradeMode === 'futures' && reduceOnly) {
+      params.reduceOnly = true; // ✅ Sadece Futures için geçerli
+    }
     if (price) {
       params.price = price.toString();
       params.timeInForce = 'GTC';
