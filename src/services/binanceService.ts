@@ -276,6 +276,9 @@ class BinanceService {
 }
 public setTradeMode(mode: 'spot' | 'futures'): void {
     this.tradeMode = mode;
+  this.baseUrl = mode === 'futures'
+    ? 'https://fapi.binance.com'
+    : 'https://api.binance.com';
   }
 private getEndpoint(pathMap: { spot: string; futures: string }): string {
     return this.tradeMode === 'futures' ? pathMap.futures : pathMap.spot;
