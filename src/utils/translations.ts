@@ -139,6 +139,7 @@ export const translations = {
     // Trading
     long: 'LONG',
     short: 'SHORT',
+    spot:'SPOT',
     buy: 'BUY',
     sell: 'SELL',
     filled: 'FILLED',
@@ -353,6 +354,7 @@ export const translations = {
     // Trading
     long: 'UZUN',
     short: 'KISA',
+    spot:'SPOT',
     buy: 'AL',
     sell: 'SAT',
     filled: 'TAMAMLANDI',
