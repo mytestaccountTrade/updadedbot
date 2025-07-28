@@ -426,21 +426,31 @@ class TradingBot {
   }
 }
 
-  private async syncRealPositions() {
-  if (this.config.mode !== 'REAL') return;
+ private async syncRealPositions() {
+  if (this.config.mode !== 'REAL' || this.config.tradeMode !== 'futures') return;
 
   try {
-    const openPositions = await binanceService.getOpenPositions(); // ← Binance API'den geliyor
+    const openPositions = await binanceService.getOpenPositions(); // ✔️ Bu artık doğru API'yi kullanıyor olmalı
     console.log(`🔄 Synced ${openPositions.length} real positions`);
 
     for (const pos of openPositions) {
-      const id = `sync-${pos.symbol}-${Date.now()}`; // Eşsiz ID üret
-      const entryPrice = parseFloat(pos.entryPrice);
-      const currentPrice = parseFloat(pos.markPrice || pos.entryPrice);
-      const size = Math.abs(parseFloat(pos.positionAmt));
-      const side = parseFloat(pos.positionAmt) > 0 ? 'LONG' : 'SHORT';
+      const positionAmt = parseFloat(pos.positionAmt);
+      const size = Math.abs(positionAmt);
+      if (size <= 0) continue; // ⛔ Pozisyon kapalı
 
-      if (size <= 0) continue; // Kapalı pozisyonları atla
+      const id = `sync-${pos.symbol}-${Date.now()}`;
+      const entryPrice = parseFloat(pos.entryPrice);
+      const markPrice = parseFloat(pos.markPrice || entryPrice);
+      const side = positionAmt > 0 ? 'LONG' : 'SHORT';
+
+      // 📌 Aynı sembol zaten eklenmiş mi? Tekrar ekleme
+      if (this.activePositionIds.has(pos.symbol)) continue;
+
+      const entryNotional = entryPrice * size;
+      const lev = this.config.leverage ?? 1;
+      const marginUsed = entryNotional / lev;
+      const pnl = (markPrice - entryPrice) * size * (side === 'LONG' ? 1 : -1);
+      const pnlPercent = (pnl / marginUsed) * 100;
 
       const position: Position = {
         id,
@@ -448,10 +458,10 @@ class TradingBot {
         side,
         size,
         entryPrice,
-        currentPrice,
+        currentPrice: markPrice,
         positionType: side,
-        pnl: 0,
-        pnlPercent: 0,
+        pnl,
+        pnlPercent,
         timestamp: Date.now()
       };
 
