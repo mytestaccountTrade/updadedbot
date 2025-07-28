@@ -468,6 +468,11 @@ class TradingBot {
   !t.exitPrice &&
   Math.abs((t.entryPrice ?? t.price) - entryPrice) < 0.01
 );
+
+if (!matchedTrade) {
+  console.warn(`❌ No matched trade found for ${symbol} at entry ${entryPrice}. Skipping position sync.`);
+  continue;
+}
       const position: Position = {
         id: `sync-${symbol}-${Date.now()}`,
         originTradeId: matchedTrade?.id, // ✅ eşleşen trade ID’si
