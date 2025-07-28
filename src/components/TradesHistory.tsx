@@ -39,9 +39,6 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
 
   const sortedTrades = [...trades].sort((a, b) => b.timestamp - a.timestamp);
   const totalPages = Math.ceil(sortedTrades.length / ITEMS_PER_PAGE);
-  const notional = trade.quantity * trade.price;
-  const leverage = trade.tradeMode === 'futures' ? config.leverage ?? 1 : 1;
-  const invested = notional / leverage;
   const paginatedTrades = sortedTrades.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
