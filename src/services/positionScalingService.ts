@@ -28,14 +28,20 @@ class PositionScalingService {
     });
   }
 
-  evaluateScaling(position: Position, marketData: MarketData, enableAutoRebalance: boolean, enableTrailingStop: boolean): {
-    shouldScaleIn: boolean;
-    shouldScaleOut: boolean;
-    shouldTrailingStop: boolean;
-    newSize?: number;
-    trailingStopPrice?: number;
-    reasoning: string;
-  } {
+  evaluateScaling(
+  position: Position,
+  marketData: MarketData,
+  enableAutoRebalance: boolean,
+  enableTrailingStop: boolean
+): {
+  shouldScaleIn: boolean;
+  shouldScaleOut: boolean;
+  shouldTrailingStop: boolean;
+  newSize?: number;
+  trailingStopPrice?: number;
+  reasoning: string;
+} {
+    
     if (!enableAutoRebalance && !enableTrailingStop) {
       return { shouldScaleIn: false, shouldScaleOut: false, shouldTrailingStop: false, reasoning: 'Auto-rebalance disabled' };
     }
