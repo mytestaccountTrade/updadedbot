@@ -65,30 +65,37 @@ class BinanceService {
   }
 
   private async initializeSymbols() {
+  const isFutures = this.config.tradeMode === 'futures';
+  const endpoint = isFutures ? '/fapi/v1/exchangeInfo' : '/api/v3/exchangeInfo';
+
   try {
-    const exchangeInfo = await this.makeRequestWithRetry('/api/v3/exchangeInfo', {}, 'GET', true);
+    const exchangeInfo = await this.makeRequestWithRetry(endpoint);
 
-    exchangeInfo.symbols
-      .filter((symbol: any) => symbol.status === 'TRADING' && symbol.symbol.endsWith('USDT'))
-      .forEach((symbol: any) => {
-        const lotSizeFilter = symbol.filters.find((f: any) => f.filterType === 'LOT_SIZE');
-        const notionalFilter = symbol.filters.find(
-          (f: any) => f.filterType === 'MIN_NOTIONAL' || f.filterType === 'NOTIONAL'
-        );
+    const validSymbols = exchangeInfo.symbols
+      .filter((symbol: any) =>
+        symbol.status === 'TRADING' &&
+        symbol.symbol.endsWith('USDT')
+      );
 
-        this.validSymbols.set(symbol.symbol, {
-          symbol: symbol.symbol,
-          minQty: parseFloat(lotSizeFilter?.minQty || '0.001'),
-          stepSize: parseFloat(lotSizeFilter?.stepSize || '0.001'),
-          minNotional: parseFloat(
-            notionalFilter?.minNotional || notionalFilter?.notional || '10'
-          ),
-        });
-      });
+    validSymbols.forEach((symbol: any) => {
+      const lotSizeFilter = symbol.filters.find((f: any) => f.filterType === 'LOT_SIZE');
+      const notionalFilter = symbol.filters.find((f: any) =>
+        f.filterType === 'MIN_NOTIONAL' || f.filterType === 'NOTIONAL'
+      );
 
-    console.log(`✅ Loaded ${this.validSymbols.size} valid trading symbols`);
+      const symbolInfo = {
+        symbol: symbol.symbol,
+        minQty: parseFloat(lotSizeFilter?.minQty || '0.0001'),
+        stepSize: parseFloat(lotSizeFilter?.stepSize || '0.0001'),
+        minNotional: parseFloat(notionalFilter?.minNotional || '10'),
+      };
+
+      this.validSymbols.set(symbol.symbol, symbolInfo);
+    });
+
+    console.log(`✅ Loaded ${this.validSymbols.size} ${isFutures ? 'futures' : 'spot'} trading symbols`);
   } catch (error) {
-    console.warn('Failed to load symbol information from API, using default symbols:', error);
+    console.warn('⚠️ Failed to load symbol info, using default fallback:', error);
 
     const defaultSymbols = [
       { symbol: 'BTCUSDT', minQty: 0.00001, stepSize: 0.00001, minNotional: 10 },
@@ -100,14 +107,14 @@ class BinanceService {
       { symbol: 'DOGEUSDT', minQty: 1, stepSize: 1, minNotional: 10 },
       { symbol: 'DOTUSDT', minQty: 0.01, stepSize: 0.01, minNotional: 10 },
       { symbol: 'AVAXUSDT', minQty: 0.001, stepSize: 0.001, minNotional: 10 },
-      { symbol: 'MATICUSDT', minQty: 0.1, stepSize: 0.1, minNotional: 10 },
+      { symbol: 'MATICUSDT', minQty: 0.1, stepSize: 0.1, minNotional: 10 }
     ];
 
-    defaultSymbols.forEach((symbolInfo) => {
+    defaultSymbols.forEach(symbolInfo => {
       this.validSymbols.set(symbolInfo.symbol, symbolInfo);
     });
 
-    console.log(`✅ Loaded ${this.validSymbols.size} default trading symbols`);
+    console.log(`✅ Loaded ${this.validSymbols.size} default fallback symbols`);
   }
 }
 
