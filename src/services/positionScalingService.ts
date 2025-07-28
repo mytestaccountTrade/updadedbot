@@ -41,86 +41,114 @@ class PositionScalingService {
   trailingStopPrice?: number;
   reasoning: string;
 } {
-    
-    if (!enableAutoRebalance && !enableTrailingStop) {
-      return { shouldScaleIn: false, shouldScaleOut: false, shouldTrailingStop: false, reasoning: 'Auto-rebalance disabled' };
-    }
-
-    const scaling = this.scalingData.get(position.id);
-    if (!scaling) {
-      this.initializePosition(position);
-      return { shouldScaleIn: false, shouldScaleOut: false, shouldTrailingStop: false, reasoning: 'Position initialized' };
-    }
-
-    const currentPrice = marketData.price;
-    const pnlPercent = position.pnlPercent / 100;
-    const isLong = position.side === 'LONG';
-
-    // Update high water mark
-    if ((isLong && currentPrice > scaling.highWaterMark) || (!isLong && currentPrice < scaling.highWaterMark)) {
-      scaling.highWaterMark = currentPrice;
-    }
-
-    let shouldScaleIn = false;
-    let shouldScaleOut = false;
-    let shouldTrailingStop = false;
-    let newSize = scaling.currentSize;
-    let reasoning = '';
-
-    // Scale In Logic (when profitable)
-    if (enableAutoRebalance && pnlPercent > this.config.scaleInThreshold && scaling.scaleInCount < this.config.maxScaleInCount) {
-      shouldScaleIn = true;
-      newSize = scaling.currentSize + (scaling.originalSize * this.config.scaleInMultiplier);
-      scaling.scaleInCount++;
-      reasoning = `Scale in: +${(pnlPercent * 100).toFixed(2)}% profit, increasing position size`;
-    }
-
-    // Scale Out Logic (when losing)
-    else if (enableAutoRebalance && pnlPercent < this.config.scaleOutThreshold && scaling.scaleOutCount < this.config.maxScaleOutCount) {
-      shouldScaleOut = true;
-      newSize = scaling.currentSize * (1 - this.config.scaleOutMultiplier);
-      scaling.scaleOutCount++;
-      reasoning = `Scale out: ${(pnlPercent * 100).toFixed(2)}% loss, reducing position size`;
-    }
-
-    // Trailing Stop Logic
-    let trailingStopPrice = scaling.trailingStopPrice;
-    if (enableTrailingStop && pnlPercent > 0.01) { // Only activate trailing stop when in profit
-      const trailingDistance = scaling.highWaterMark * this.config.trailingStopPercent;
-      const newTrailingStop = isLong 
-        ? scaling.highWaterMark - trailingDistance
-        : scaling.highWaterMark + trailingDistance;
-
-      if (!trailingStopPrice || 
-          (isLong && newTrailingStop > trailingStopPrice) || 
-          (!isLong && newTrailingStop < trailingStopPrice)) {
-        trailingStopPrice = newTrailingStop;
-        scaling.trailingStopPrice = trailingStopPrice;
-      }
-
-      // Check if trailing stop is hit
-      if ((isLong && currentPrice <= trailingStopPrice) || (!isLong && currentPrice >= trailingStopPrice)) {
-        shouldTrailingStop = true;
-        reasoning = `Trailing stop triggered at ${trailingStopPrice.toFixed(2)}`;
-      }
-    }
-
-    // Update scaling data
-    if (shouldScaleIn || shouldScaleOut) {
-      scaling.currentSize = newSize;
-    }
-
-    this.saveScalingData();
-
+  if (!enableAutoRebalance && !enableTrailingStop) {
     return {
-      shouldScaleIn,
-      shouldScaleOut,
-      shouldTrailingStop,
-      newSize: shouldScaleIn || shouldScaleOut ? newSize : undefined,
-      trailingStopPrice,
-      reasoning: reasoning || 'No scaling action needed'
+      shouldScaleIn: false,
+      shouldScaleOut: false,
+      shouldTrailingStop: false,
+      reasoning: 'Auto-rebalance disabled'
     };
   }
+
+  const scaling = this.scalingData.get(position.id);
+  if (!scaling) {
+    this.initializePosition(position);
+    return {
+      shouldScaleIn: false,
+      shouldScaleOut: false,
+      shouldTrailingStop: false,
+      reasoning: 'Position initialized'
+    };
+  }
+
+  const currentPrice = marketData.price;
+  const isLong = position.side === 'LONG';
+
+  // Kaldıraç: spot için 1, futures için position.leverage veya default
+  const leverage = (position as any).leverage ?? 1;
+
+  // Pozisyonun gerçek maruziyeti (futures işlemlerde büyür)
+  const effectiveExposure = position.size * position.entryPrice * leverage;
+
+  // pnlPercent’i kaldıraçla yeniden hesapla
+  // position.pnl zaten dolar cinsinden kâr/zarar; maruziyete bölerek yüzdeyi buluyoruz
+  const pnlPercent = effectiveExposure !== 0 ? position.pnl / effectiveExposure : 0;
+
+  // High-water mark güncelle
+  if ((isLong && currentPrice > scaling.highWaterMark) || (!isLong && currentPrice < scaling.highWaterMark)) {
+    scaling.highWaterMark = currentPrice;
+  }
+
+  let shouldScaleIn = false;
+  let shouldScaleOut = false;
+  let shouldTrailingStop = false;
+  let newSize = scaling.currentSize;
+  let reasoning = '';
+
+  // Scale In mantığı (kârlı olduğunda)
+  if (
+    enableAutoRebalance &&
+    pnlPercent > this.config.scaleInThreshold &&
+    scaling.scaleInCount < this.config.maxScaleInCount
+  ) {
+    shouldScaleIn = true;
+    newSize = scaling.currentSize + scaling.originalSize * this.config.scaleInMultiplier;
+    scaling.scaleInCount++;
+    reasoning = `Scale in: +${(pnlPercent * 100).toFixed(2)}% profit, increasing position size`;
+  }
+  // Scale Out mantığı (zararda olduğunda)
+  else if (
+    enableAutoRebalance &&
+    pnlPercent < this.config.scaleOutThreshold &&
+    scaling.scaleOutCount < this.config.maxScaleOutCount
+  ) {
+    shouldScaleOut = true;
+    newSize = scaling.currentSize * (1 - this.config.scaleOutMultiplier);
+    scaling.scaleOutCount++;
+    reasoning = `Scale out: ${(pnlPercent * 100).toFixed(2)}% loss, reducing position size`;
+  }
+
+  // Trailing Stop mantığı
+  let trailingStopPrice = scaling.trailingStopPrice;
+  // Yalnızca kârda olan işlemler için etkinleştir, kaldıraçlı yüzde kullan
+  if (enableTrailingStop && pnlPercent > 0.01) {
+    const trailingDistance = scaling.highWaterMark * this.config.trailingStopPercent;
+    const newTrailingStop = isLong
+      ? scaling.highWaterMark - trailingDistance
+      : scaling.highWaterMark + trailingDistance;
+
+    if (
+      !trailingStopPrice ||
+      (isLong && newTrailingStop > trailingStopPrice) ||
+      (!isLong && newTrailingStop < trailingStopPrice)
+    ) {
+      trailingStopPrice = newTrailingStop;
+      scaling.trailingStopPrice = trailingStopPrice;
+    }
+
+    // Trailing stop seviyesi tetikleniyor mu?
+    if ((isLong && currentPrice <= trailingStopPrice) || (!isLong && currentPrice >= trailingStopPrice)) {
+      shouldTrailingStop = true;
+      reasoning = `Trailing stop triggered at ${trailingStopPrice.toFixed(2)}`;
+    }
+  }
+
+  // Ölçeklendirme verilerini güncelle
+  if (shouldScaleIn || shouldScaleOut) {
+    scaling.currentSize = newSize;
+  }
+
+  this.saveScalingData();
+
+  return {
+    shouldScaleIn,
+    shouldScaleOut,
+    shouldTrailingStop,
+    newSize: shouldScaleIn || shouldScaleOut ? newSize : undefined,
+    trailingStopPrice,
+    reasoning: reasoning || 'No scaling action needed'
+  };
+}
 
   getScalingInfo(positionId: string): PositionScaling | null {
     return this.scalingData.get(positionId) || null;
