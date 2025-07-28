@@ -9,7 +9,9 @@ class SimulationReplayService {
   async runSimulationReplay(
     date: string,
     strategies: any,
-    initialBalance: number = 10000
+    initialBalance: number = 10000,
+    positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
+  leverage: number = 1
   ): Promise<{
     totalPnL: number;
     totalTrades: number;
@@ -53,16 +55,18 @@ class SimulationReplayService {
         // Execute trade if confidence is high enough
         if (combinedResult.action !== 'HOLD' && combinedResult.confidence > 0.6) {
           const tradeAmount = balance * 0.1; // 10% of balance per trade
+          // Pozisyon büyüklüğü (lot adedi)
+          const quantity = tradeAmount / entryPrice;
           const entryPrice = currentData.price;
           const exitPrice = nextData.price;
           
-          let pnl = 0;
-          if (combinedResult.action === 'BUY') {
-            pnl = (exitPrice - entryPrice) / entryPrice * tradeAmount;
-          } else {
-            pnl = (entryPrice - exitPrice) / entryPrice * tradeAmount;
-          }
-
+          let rawPnl: number;
+  if (combinedResult.action === 'BUY') {
+    rawPnl = (exitPrice - entryPrice) * quantity;
+  } else {
+    rawPnl = (entryPrice - exitPrice) * quantity;
+  }
+         const pnl = rawPnl * (positionType === 'SPOT' ? 1 : leverage);
           balance += pnl;
           totalTrades++;
 
@@ -72,6 +76,8 @@ class SimulationReplayService {
             entryPrice,
             exitPrice,
             pnl,
+            leverage: positionType === 'SPOT' ? 1 : leverage,
+            positionType,
             strategy: combinedResult.bestStrategy,
             confidence: combinedResult.confidence
           };
