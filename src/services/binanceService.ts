@@ -639,47 +639,59 @@ public async getBalance(): Promise<any> {
 
 
   async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
-    try {
-      // Validate symbol and quantity
-      const validation = this.validateOrderQuantity(symbol, quantity);
-      if (!validation.valid) {
-        console.error(`[❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error}`);
-        return null;
-      }
-
-      const params: any = {
-        symbol,
-        side,
-        type: price ? 'LIMIT' : 'MARKET',
-        quantity: validation.adjustedQty!.toString(),
-      };
-
-      if (price) {
-        params.price = price.toString();
-        params.timeInForce = 'GTC';
-      }
-
-      const endpoint = this.getEndpoint({
-  spot: '/api/v3/order',
-  futures: '/fapi/v1/order',
-});
-const result = await this.makeRequest(endpoint, params, 'POST');
-      
-      return {
-        id: result.orderId.toString(),
-        symbol,
-        side,
-        type: params.type,
-        quantity: validation.adjustedQty!,
-        price: price || parseFloat(result.fills?.[0]?.price || '0'),
-        status: this.mapBinanceStatus(result.status), // 🧠 yeni bir helper fonksiyon
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      console.error('Failed to place trade:', error);
+  try {
+    const validation = this.validateOrderQuantity(symbol, quantity);
+    if (!validation.valid) {
+      console.error(`[❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error}`);
       return null;
     }
+
+    if (!price) {
+      const marketData = await this.getMarketPrice(symbol); // ✅ Fiyat çek
+      price = marketData;
+    }
+
+    const notional = price * validation.adjustedQty!;
+    if (notional < 5) {
+      console.warn(`❌ Order notional too small: ${notional.toFixed(2)} USDT. Skipping order.`);
+      return null;
+    }
+
+    const params: any = {
+      symbol,
+      side,
+      type: price ? 'LIMIT' : 'MARKET',
+      quantity: validation.adjustedQty!.toString(),
+    };
+
+    if (price) {
+      params.price = price.toString();
+      params.timeInForce = 'GTC';
+    }
+
+    const endpoint = this.getEndpoint({
+      spot: '/api/v3/order',
+      futures: '/fapi/v1/order',
+    });
+
+    const result = await this.makeRequest(endpoint, params, 'POST');
+
+    return {
+      id: result.orderId.toString(),
+      symbol,
+      side,
+      type: params.type,
+      quantity: validation.adjustedQty!,
+      price: price || parseFloat(result.fills?.[0]?.price || '0'),
+      status: this.mapBinanceStatus(result.status),
+      timestamp: Date.now(),
+    };
+
+  } catch (error) {
+    console.error('Failed to place trade:', error);
+    return null;
   }
+}
 private mapBinanceStatus(rawStatus: string): 'FILLED' | 'PENDING' | 'CANCELLED' {
   if (rawStatus === 'FILLED') return 'FILLED';
   if (rawStatus === 'CANCELED' || rawStatus === 'EXPIRED' || rawStatus === 'REJECTED') return 'CANCELLED';
