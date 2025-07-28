@@ -71,7 +71,7 @@ class BinanceService {
       futures: '/fapi/v1/exchangeInfo',
     });
 
-    const exchangeInfo = await this.makeRequestWithRetry(endpoint);
+    const exchangeInfo = await this.makeRequestWithRetry(endpoint, {}, 'GET', true);
 
     exchangeInfo.symbols
       .filter((symbol: any) =>
