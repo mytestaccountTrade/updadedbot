@@ -360,12 +360,27 @@ class TradingBot {
 
     const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
     const randomTrade = Math.random() < 0.1;
-
+     // 🛑 SPOT modunda SELL sinyallerini engelle
+    if (
+      this.config.tradeMode === 'spot' &&
+      (finalSignal.action === 'SELL' || signal.action === 'SELL')
+    ) {
+      logService.warning('sellBlockedOnSpot', {
+        symbol: marketData.symbol,
+        reason: 'SELL action blocked in spot mode.'
+      });
+      return; // İşlemi tamamen durdur
+    }
     if (shouldTrade || randomTrade) {
       let action = finalSignal.action;
 
+      // Rastgele işlemse, SPOT modunda sadece BUY'a izin ver
       if (randomTrade && !shouldTrade) {
-        action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+        if (this.config.tradeMode === 'spot') {
+          action = 'BUY';
+        } else {
+          action = Math.random() > 0.5 ? 'BUY' : 'SELL';
+        }
         logService.learning('randomExplorationTrade', {
           action,
           symbol: marketData.symbol
