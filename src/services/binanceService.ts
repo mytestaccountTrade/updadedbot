@@ -287,7 +287,7 @@ private getEndpoint(pathMap: { spot: string; futures: string }): string {
   public async getMarketPrice(symbol: string): Promise<number> {
   const endpoint = this.getEndpoint({
     spot: '/api/v3/ticker/price',
-    futures: '/api/v3/ticker/price',
+    futures: '/fapi/v1/ticker/price',
   });
   try {
     const ticker: any = await this.makeRequest(endpoint, { symbol });
@@ -689,7 +689,7 @@ if (this.tradeMode === 'futures') {
     // seçili moda göre doğru endpoint
     const endpoint = this.getEndpoint({
       spot: '/api/v3/ticker/price',
-      futures: '/api/v3/ticker/price',
+      futures: '/fapi/v1/ticker/price',
     });
     const ticker = await this.makeRequest(endpoint, { symbol });
     return parseFloat(ticker.price);
