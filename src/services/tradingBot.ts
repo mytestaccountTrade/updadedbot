@@ -434,15 +434,31 @@ class TradingBot {
     console.log(`🔄 Synced ${openPositions.length} real positions`);
 
     for (const pos of openPositions) {
-      const { symbol, size, entryPrice, currentPrice, side, unrealizedProfit, leverage } = pos;
+      const {
+        symbol,
+        size,
+        entryPrice,
+        currentPrice,
+        side,
+        unrealizedProfit,
+        leverage
+      } = pos;
 
-      if (!symbol || !entryPrice || !currentPrice || !side || size <= 0 || isNaN(size)) {
-        console.warn(`⚠️ Skipping invalid position: symbol=${symbol}, size=${size}`);
+      if (
+        !symbol ||
+        !side ||
+        isNaN(size) || size <= 0 ||
+        isNaN(entryPrice) || entryPrice <= 0 ||
+        isNaN(currentPrice) || currentPrice <= 0 ||
+        isNaN(unrealizedProfit) ||
+        isNaN(leverage) || leverage <= 0
+      ) {
+        console.warn(`⚠️ Skipping invalid position: symbol=${symbol}, size=${size}, entry=${entryPrice}, mark=${currentPrice}`);
         continue;
       }
 
       const entryNotional = entryPrice * size;
-      const marginUsed = leverage > 0 ? entryNotional / leverage : entryNotional;
+      const marginUsed = entryNotional / leverage;
 
       const pnl = unrealizedProfit;
       const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
@@ -463,6 +479,7 @@ class TradingBot {
       this.portfolio.positions.push(position);
       this.activePositionIds.add(symbol);
     }
+
   } catch (error) {
     console.error('❌ Failed to sync real positions:', error);
   }
