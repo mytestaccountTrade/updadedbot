@@ -464,9 +464,9 @@ class TradingBot {
       const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
       const matchedTrade = this.portfolio.trades.find(t =>
   t.symbol === symbol &&
-  t.side === side &&
+  t.side === (side === 'LONG' ? 'BUY' : 'SELL') && // 🔁 Dönüştür
   !t.exitPrice &&
-  Math.abs((t.entryPrice ?? t.price) - entryPrice) < 0.01
+  Math.abs(((t.entryPrice ?? t.price) - entryPrice) / entryPrice) < 0.03 // 🔁 %3 tolerans
 );
 
 if (!matchedTrade) {
