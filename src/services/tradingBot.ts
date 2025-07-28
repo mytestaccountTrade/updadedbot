@@ -780,25 +780,39 @@ position.pnlPercent = (position.pnl / marginUsed) * 100;
   }
 
   private checkTraditionalExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
-  // 📉 Varsayılan oranlar
   let stopLossThreshold: number;
   let takeProfitThreshold: number;
 
-  const COMMISSION_BUFFER = 0.3; // Komisyonları hesaba kat (%0.3)
+  const COMMISSION_BUFFER = 0.3; // Komisyon toleransı
+  const leverage = this.config.leverage ?? 1;
 
   if (this.config.enableAggressiveMode) {
-    // ⚡ Agresif mod: hızlı ama dengeli kazanç hedefi
-    takeProfitThreshold = 2.0;   // %2.5 kâr
-    stopLossThreshold = -1.25;   // -%1.25 zarar
+    // Agresif mod: daha sıkı eşikler
+    if (this.config.tradeMode === 'futures') {
+      stopLossThreshold = -2.0;
+      takeProfitThreshold = 4.0;
+    } else {
+      stopLossThreshold = -1.0;
+      takeProfitThreshold = 1.75;
+    }
+
   } else if (this.config.fastLearningMode) {
-    takeProfitThreshold = 2.5;
-    stopLossThreshold = -1.5;
+    // Öğrenme modu: orta eşikler
+    if (this.config.tradeMode === 'futures') {
+      stopLossThreshold = -2.5;
+      takeProfitThreshold = 5.0;
+    } else {
+      stopLossThreshold = -1.25;
+      takeProfitThreshold = 2.25;
+    }
+
   } else {
+    // Kullanıcı ayarları (config üzerinden)
     stopLossThreshold = -this.config.stopLossPercent * 100;
     takeProfitThreshold = this.config.takeProfitPercent * 100;
   }
 
-  // 🌪️ Volatiliteye göre çarpan hesapla
+  // 🌪️ Volatilite uyarlaması
   const volatility = marketData.bollinger
     ? (marketData.bollinger.upper - marketData.bollinger.lower) / marketData.bollinger.middle
     : 0.02;
@@ -808,12 +822,10 @@ position.pnlPercent = (position.pnl / marginUsed) * 100;
   const adaptiveStopLoss = (stopLossThreshold - COMMISSION_BUFFER) * volatilityMultiplier;
   const adaptiveTakeProfit = (takeProfitThreshold + COMMISSION_BUFFER) * volatilityMultiplier;
 
-  // 🚨 Stop Loss
   if (position.pnlPercent <= adaptiveStopLoss) {
     return { shouldExit: true, reason: 'ADAPTIVE_STOP_LOSS' };
   }
 
-  // 🎯 Take Profit
   if (position.pnlPercent >= adaptiveTakeProfit) {
     return { shouldExit: true, reason: 'ADAPTIVE_TAKE_PROFIT' };
   }
