@@ -638,11 +638,11 @@ public async getBalance(): Promise<any> {
 }
 
 
-  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number, reduceOnly: boolean = false): Promise<Trade | null> {
+  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
   try {
     const validation = this.validateOrderQuantity(symbol, quantity);
     if (!validation.valid) {
-      console.error(`[❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error}`);
+      console.error([❌ Order Validation] Symbol: ${symbol}, Qty: ${quantity}, Reason: ${validation.error});
       return null;
     }
 
@@ -653,7 +653,7 @@ public async getBalance(): Promise<any> {
 
     const notional = price * validation.adjustedQty!;
     if (notional < 5) {
-      console.warn(`❌ Order notional too small: ${notional.toFixed(2)} USDT. Skipping order.`);
+      console.warn(❌ Order notional too small: ${notional.toFixed(2)} USDT. Skipping order.);
       return null;
     }
 
@@ -668,9 +668,7 @@ public async getBalance(): Promise<any> {
       params.price = price.toString();
       params.timeInForce = 'GTC';
     }
-    if (this.tradeMode === 'futures' && reduceOnly) {
-      params.reduceOnly = true; // ✅ Sadece Futures için geçerli
-    }
+
     const endpoint = this.getEndpoint({
       spot: '/api/v3/order',
       futures: '/fapi/v1/order',
