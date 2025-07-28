@@ -1421,11 +1421,13 @@ this.portfolio.availableBalance -= balanceDeduction;
       return false;
     }
 
+    // ⏱️ Güncel durumu tekrar sorgula
+  const finalStatus = await binanceService.getOrderStatus(position.symbol, realTrade.id);
     // Trade güncelle
     originalTrade.exitPrice = realTrade.price;
     originalTrade.profit = position.pnl;
     originalTrade.closeTimestamp = closeTimestamp;
-    originalTrade.status = realTrade.status;
+    originalTrade.status = finalStatus;
     const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
     originalTrade.duration = duration;
   } else {
