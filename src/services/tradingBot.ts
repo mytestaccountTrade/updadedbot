@@ -45,6 +45,7 @@ class TradingBot {
           mode: savedConfig.mode || 'SIMULATION',
           simulationBalance: savedConfig.simulationBalance || 10000,
           tradeMode:savedConfig.tradeMode || 'futures',
+          leverage: savedConfig.leverage || 1,
           fastLearningMode: savedConfig.fastLearningMode || false,
           adaptiveStrategyEnabled: savedConfig.adaptiveStrategyEnabled !== undefined ? savedConfig.adaptiveStrategyEnabled : true,
           maxRiskPerTrade: savedConfig.maxRiskPerTrade || 0.05,
@@ -102,6 +103,7 @@ class TradingBot {
       fastLearningMode: false,
       adaptiveStrategyEnabled: true,
       tradeMode: 'futures',
+      leverage: 1,
       maxRiskPerTrade: 0.05,
       stopLossPercent: 0.03,
       takeProfitPercent: 0.06,
@@ -908,9 +910,22 @@ class TradingBot {
     const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
     
     const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
-    const riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
-    const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
-    const quantity = (riskAmount * riskMultiplier) / marketData.price;
+    // Risk miktarını hesapla
+let riskAmount = this.portfolio.availableBalance *
+  this.config.maxRiskPerTrade *
+  finalRiskMultiplier;
+
+// Futures modunda kaldıraç uygula
+if (this.config.tradeMode === 'futures') {
+  const lev = this.config.leverage ?? 1;
+  riskAmount *= lev;
+}
+
+// Mevcut agresif mod çarpanı
+const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
+
+// Lot adedini hesapla
+const quantity = (riskAmount * riskMultiplier) / marketData.price;
 
     
     if (quantity * marketData.price > this.portfolio.availableBalance) {
@@ -919,10 +934,17 @@ class TradingBot {
     }
     
     // Minimum trade validation
-    if (quantity * marketData.price < 10) {
-      console.log(`⚠️ Trade too small for ${symbol}: $${(quantity * marketData.price).toFixed(2)} < $10 minimum`);
-      return;
-    }
+    if (
+  this.config.tradeMode === 'spot' &&
+  quantity * marketData.price < 10
+) {
+  console.log(
+    `⚠️ Trade too small for ${symbol}: $${(
+      quantity * marketData.price
+    ).toFixed(2)} < $10 minimum`
+  );
+  return;
+}
     
     // Generate unique trade ID
     const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1006,14 +1028,18 @@ const position: Position = {
         profitTarget: '1-2%'
       }, `Aggressive trade: ${trade.side} ${symbol} (${this.portfolio.positions.length}/40 positions)`);
     }
-      const COMMISSION_RATE = 0.001; // %0.1 Binance spot varsayılan
+     const COMMISSION_SPOT = 0.001;
+const COMMISSION_FUTURES = 0.0004;
+const FUNDING_ESTIMATE = 0.0001;
 
-// Hesapla
 const entryCost = quantity * marketData.price;
-const entryFee = entryCost * COMMISSION_RATE;
+
+const totalFee = this.config.tradeMode === 'futures'
+  ? entryCost * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
+  : entryCost * COMMISSION_SPOT;
     // Record trade for learning
     await learningService.recordTrade(trade, position, tradeContext);
-    this.portfolio.availableBalance -= entryCost + entryFee;
+    this.portfolio.availableBalance -= entryCost + totalFee;
     
     console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
     console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
@@ -1143,11 +1169,22 @@ const entryFee = entryCost * COMMISSION_RATE;
 originalTrade.duration = duration;
   } else {
     // Simülasyon modunda fiyatı ve kârı hesapla
-    const COMMISSION_RATE = 0.001;
-    const grossExit = position.size * position.currentPrice;
-    const exitFee = grossExit * COMMISSION_RATE;
-    const netExit = grossExit - exitFee;
+   // Çıkış işlemi ücret oranları
+const COMMISSION_SPOT = 0.001;       // %0.1 komisyon
+const COMMISSION_FUTURES = 0.0004;   // %0.04 komisyon
+const FUNDING_ESTIMATE = 0.0001;     // İsteğe bağlı fonlama tahmini (%0.01)
 
+// Brüt çıkış tutarı (pozisyon büyüklüğü * güncel fiyat)
+const grossExit = position.size * position.currentPrice;
+
+// Ücreti mod bazında hesapla
+const exitFee =
+  this.config.tradeMode === 'futures'
+    ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
+    : grossExit * COMMISSION_SPOT;
+
+// Net çıkış (brüt – ücret)
+const netExit = grossExit - exitFee;
     // Güncelleme
     originalTrade.exitPrice = position.currentPrice;
     originalTrade.profit = position.pnl;
