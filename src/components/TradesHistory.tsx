@@ -3,6 +3,7 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Trade,BotConfig } from '../types/trading';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '../contexts/LanguageContext';
+import { tradingBot } from '../services/tradingBot';
 
 interface TradesHistoryProps {
   trades: Trade[];
