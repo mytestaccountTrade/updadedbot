@@ -38,6 +38,7 @@ export interface Trade {
   exitPrice?: number;
   profit?: number;
   duration?: number;  // ⏱️ Süre (saniye cinsinden)
+  entryPrice?:number;
 }
 
 export interface Portfolio {
