@@ -21,7 +21,7 @@ class TradingBot {
     // Load saved config or use defaults
     this.config = this.loadConfig();
     if (this.config.tradeMode) {
-      binanceService.setTradeMode(this.config.tradeMode);
+      binanceService.setTradeMode(this.config.tradeMode,this.config.leverage);
     }
     this.portfolio = {
       totalValue: this.config.simulationBalance,
@@ -162,7 +162,7 @@ class TradingBot {
     // Save configuration immediately
     this.saveConfig();
     if (config.tradeMode) {
-      binanceService.setTradeMode(config.tradeMode);
+      binanceService.setTradeMode(config.tradeMode,config.leverage);
     }
     // Update simulation balance if changed
     if (config.simulationBalance && this.config.mode === 'SIMULATION') {
