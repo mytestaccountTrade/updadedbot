@@ -709,17 +709,6 @@ if (!matchedTrade) {
 
   private async updatePositions() {
      // 🔄 1. Real pozisyonlarla senkronize et
-  if (this.config.mode === 'REAL') {
-    const openPositions = await binanceService.getOpenPositions();
-    const openSymbols = new Set(openPositions.map(p => p.symbol));
-
-    for (const localPos of this.portfolio.positions) {
-      if (!openSymbols.has(localPos.symbol)) {
-        console.log(`🔁 Pozisyon kapalı ama hâlâ bekliyor: ${localPos.symbol}, kapatılıyor...`);
-        await this.closePositionInternal(localPos, 'SYNC: Binance closed');
-      }
-    }
-  }
     if (this.portfolio.positions.length === 0) return;
     
     console.log(`🔄 Updating ${this.portfolio.positions.length} positions...`);
@@ -1216,6 +1205,15 @@ private async checkMultiExitLevels(
   };
 
   if (this.config.mode === 'REAL') {
+     // 🔐 Burası eklenecek yer:
+  if (this.config.tradeMode === 'futures') {
+    const futuresPos = await binanceService.getFuturesPosition(position.symbol);
+    const amt = parseFloat(futuresPos?.positionAmt ?? '0');
+    if (!futuresPos || amt === 0) {
+      console.warn(`⛔ Pozisyon zaten kapalı: ${position.symbol}. ReduceOnly order atlanacak.`);
+      return false;
+    }
+  }
     const realTrade = await binanceService.placeTrade(symbol, action, quantity);
     if (!realTrade) {
       console.log(`❌ Real trade FAILED for ${symbol}: Binance API rejected or returned null`);
