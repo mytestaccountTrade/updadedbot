@@ -466,7 +466,7 @@ class TradingBot {
   t.symbol === symbol &&
   t.side === (side === 'LONG' ? 'BUY' : 'SELL') && // 🔁 Dönüştür
   !t.exitPrice &&
-  Math.abs(((t.entryPrice ?? t.price) - entryPrice) / entryPrice) < 0.03 // 🔁 %3 tolerans
+  Math.abs(((t.price) - entryPrice) / entryPrice) < 0.03 // 🔁 %3 tolerans
 );
 
 if (!matchedTrade) {
