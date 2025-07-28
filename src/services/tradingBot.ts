@@ -466,7 +466,7 @@ class TradingBot {
   t.symbol === symbol &&
   t.side === side &&
   !t.exitPrice &&
-  Math.abs(t.entryPrice - entryPrice) < 0.01 // toleranslı eşleşme
+  Math.abs((t.entryPrice ?? t.price) - entryPrice) < 0.01
 );
       const position: Position = {
         id: `sync-${symbol}-${Date.now()}`,
