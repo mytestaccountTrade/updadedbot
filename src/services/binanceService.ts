@@ -715,7 +715,10 @@ async getOrderStatus(symbol: string, orderId: string): Promise<'FILLED' | 'PENDI
     return 'PENDING'; // Default to pending if failed
   }
 }
-  
+ async getFuturesPosition(symbol: string) {
+  const result = await this.makeRequest('/fapi/v2/account', {}, 'GET');
+  return result.positions.find((p: any) => p.symbol === symbol);
+} 
 private mapBinanceStatus(rawStatus: string): 'FILLED' | 'PENDING' | 'CANCELLED' {
   if (rawStatus === 'FILLED') return 'FILLED';
   if (rawStatus === 'CANCELED' || rawStatus === 'EXPIRED' || rawStatus === 'REJECTED') return 'CANCELLED';
