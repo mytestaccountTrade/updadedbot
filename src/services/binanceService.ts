@@ -35,7 +35,7 @@ class BinanceService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private tradeMode: 'spot' | 'futures' = 'futures';
-  private leverage:1;
+  private leverage:number;
   
   // Throttling and rate limiting
   private lastTradingPairsFetch: number = 0;
