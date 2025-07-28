@@ -34,6 +34,9 @@ export interface TradeRecord {
   };
   outcome: 'PROFIT' | 'LOSS' | 'BREAKEVEN';
   confidence: number;
+  // Yeni alanlar
+  positionType: 'SPOT' | 'LONG' | 'SHORT';
+  leverage?: number; // default 1
 }
 
 interface LearnedPattern {
@@ -162,6 +165,9 @@ class LearningService {
       indicators: this.calculateIndicators(context.marketData),
       outcome: 'BREAKEVEN', // Will be updated when position closes
       confidence: context.signal?.confidence || 0.5,
+      // Yeni eklenen alanlar
+    positionType: position.positionType,
+    leverage: (position as any).leverage ?? 1
     };
 
     this.tradeHistory.push(record);
