@@ -638,7 +638,7 @@ public async getBalance(): Promise<any> {
 }
 
 
-  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number): Promise<Trade | null> {
+  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number, reduceOnly: boolean = false): Promise<Trade | null> {
   try {
     const validation = this.validateOrderQuantity(symbol, quantity);
     if (!validation.valid) {
@@ -668,7 +668,9 @@ public async getBalance(): Promise<any> {
       params.price = price.toString();
       params.timeInForce = 'GTC';
     }
-
+    if (this.tradeMode === 'futures' && reduceOnly) {
+      params.reduceOnly = true; // ✅ Sadece Futures için geçerli
+    }
     const endpoint = this.getEndpoint({
       spot: '/api/v3/order',
       futures: '/fapi/v1/order',
