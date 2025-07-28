@@ -638,7 +638,13 @@ public async getBalance(): Promise<any> {
 }
 
 
-  async placeTrade(symbol: string, side: 'BUY' | 'SELL', quantity: number, price?: number,reduceOnly: boolean = false): Promise<Trade | null> {
+  async placeTrade(
+  symbol: string,
+  side: 'BUY' | 'SELL',
+  quantity: number,
+  price?: number,
+  reduceOnly: boolean = false
+): Promise<Trade | null> {
   try {
     const validation = this.validateOrderQuantity(symbol, quantity);
     if (!validation.valid) {
@@ -647,8 +653,7 @@ public async getBalance(): Promise<any> {
     }
 
     if (!price) {
-      const marketData = await this.getMarketPrice(symbol); // ✅ Fiyat çek
-      price = marketData;
+      price = await this.getMarketPrice(symbol);
     }
 
     const notional = price * validation.adjustedQty!;
@@ -663,10 +668,12 @@ public async getBalance(): Promise<any> {
       type: price ? 'LIMIT' : 'MARKET',
       quantity: validation.adjustedQty!.toString(),
     };
+
     if (this.tradeMode === 'futures' && reduceOnly) {
       params.reduceOnly = true;
     }
-    if (price) {
+
+    if (params.type === 'LIMIT') {
       params.price = price.toString();
       params.timeInForce = 'GTC';
     }
