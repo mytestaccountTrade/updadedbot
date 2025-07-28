@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { Trade } from '../types/trading';
+import { Trade,BotConfig } from '../types/trading';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '../contexts/LanguageContext';
+import { tradingBot } from '../services/tradingBot';
 
 interface TradesHistoryProps {
   trades: Trade[];
 }
-
+const config = tradingBot.getConfig();
 const ITEMS_PER_PAGE = 10;
 
 // 🔧 Süreyi okunabilir formata çeviren yardımcı fonksiyon
