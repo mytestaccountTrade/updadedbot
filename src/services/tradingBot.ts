@@ -228,6 +228,13 @@ class TradingBot {
     logService.info('botStarted', { mode: this.config.mode });
     logService.info('Trade Mode', { mode: this.config.tradeMode });
     // Subscribe to WebSocket data for top trading pairs
+    if (this.config.apiKey && this.config.apiSecret !== undefined) {
+      binanceService.setCredentials(
+        this.config.apiKey,
+        this.config.apiSecret,
+        this.config.mode === 'SIMULATION'
+      );
+    }
     this.initializeWebSocketSubscriptions();
     
     // Update real wallet balance if in real mode
