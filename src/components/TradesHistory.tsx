@@ -63,60 +63,80 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
           </tr>
         </thead>
         <tbody>
-          {paginatedTrades.map((trade) => (
-            <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="py-4 px-4 text-sm text-gray-500">
-                {formatDistanceToNow(new Date(trade.timestamp), { addSuffix: true })}
-              </td>
-              <td className="py-4 px-4 font-medium text-gray-900">{trade.symbol}</td>
-              <td className="py-4 px-4">
-                <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  trade.side === 'BUY' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {trade.side === 'BUY' ? (
-                    <ArrowUpRight className="w-3 h-3" />
-                  ) : (
-                    <ArrowDownRight className="w-3 h-3" />
-                  )}
-                  <span>{t(trade.side.toLowerCase() as any)}</span>
-                </span>
-              </td>
-              <td className="py-4 px-4 text-gray-900">{trade.type}</td>
-              <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
-              <td className="py-4 px-4 text-gray-900">
-                {trade.price ? `$${trade.price.toFixed(6)}` : '-'}
-              </td>
-              <td className="py-4 px-4 text-gray-900">
-                {trade.exitPrice ? `$${trade.exitPrice.toFixed(6)}` : '-'}
-              </td>
-              <td className="py-4 px-4 text-gray-900">
-              {trade.price ? `$${(trade.price * trade.quantity).toFixed(2)}` : '-'}
-              </td>
-              <td className="py-4 px-4">
-                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                  trade.status === 'FILLED' 
-                    ? 'bg-green-100 text-green-800'
-                    : trade.status === 'PENDING'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {t(trade.status.toLowerCase() as any)}
-                </span>
-              </td>
-              <td className={`py-4 px-4 font-medium ${
-                trade.profit 
-                  ? trade.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                  : 'text-gray-400'
-              }`}>
-                {trade.profit ? `$${trade.profit.toFixed(6)}` : '-'}
-              </td>
-              <td className="py-4 px-4 text-gray-900">
-                {typeof trade.duration === 'number' ? formatDuration(trade.duration) : '-'}
-              </td>
-            </tr>
-          ))}
+          {paginatedTrades.map((trade) => {
+  const notional = trade.quantity * trade.price;
+  const leverage = config.tradeMode === 'futures' ? config.leverage ?? 1 : 1;
+  const invested = notional / leverage;
+
+  return (
+    <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
+      <td className="py-4 px-4 text-sm text-gray-500">
+        {formatDistanceToNow(new Date(trade.timestamp), { addSuffix: true })}
+      </td>
+      <td className="py-4 px-4 font-medium text-gray-900">{trade.symbol}</td>
+      <td className="py-4 px-4">
+        <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+          trade.side === 'BUY' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {trade.side === 'BUY' ? (
+            <ArrowUpRight className="w-3 h-3" />
+          ) : (
+            <ArrowDownRight className="w-3 h-3" />
+          )}
+          <span>{t(trade.side.toLowerCase() as any)}</span>
+        </span>
+      </td>
+      <td className="py-4 px-4 text-gray-900">{trade.type}</td>
+      <td className="py-4 px-4 text-gray-900">{trade.quantity.toFixed(6)}</td>
+
+      {config.tradeMode === 'futures' ? (
+        <>
+          <td>{invested.toFixed(2)}</td>
+          <td>{notional.toFixed(2)}</td>
+        </>
+      ) : (
+        <>
+          <td>{notional.toFixed(2)}</td>
+          <td>-</td>
+        </>
+      )}
+
+      <td className="py-4 px-4 text-gray-900">
+        {trade.price ? `$${trade.price.toFixed(6)}` : '-'}
+      </td>
+      <td className="py-4 px-4 text-gray-900">
+        {trade.exitPrice ? `$${trade.exitPrice.toFixed(6)}` : '-'}
+      </td>
+      <td className="py-4 px-4 text-gray-900">
+        {trade.price ? `$${(trade.price * trade.quantity).toFixed(2)}` : '-'}
+      </td>
+      <td className="py-4 px-4">
+        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+          trade.status === 'FILLED' 
+            ? 'bg-green-100 text-green-800'
+            : trade.status === 'PENDING'
+            ? 'bg-yellow-100 text-yellow-800'
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {t(trade.status.toLowerCase() as any)}
+        </span>
+      </td>
+      <td className={`py-4 px-4 font-medium ${
+        typeof trade.profit === 'number'
+          ? trade.profit >= 0 ? 'text-green-600' : 'text-red-600'
+          : 'text-gray-400'
+      }`}>
+        {typeof trade.profit === 'number' ? `$${trade.profit.toFixed(6)}` : '-'}
+      </td>
+      <td className="py-4 px-4 text-gray-900">
+        {typeof trade.duration === 'number' ? formatDuration(trade.duration) : '-'}
+      </td>
+    </tr>
+  );
+})}
+
         </tbody>
       </table>
 
