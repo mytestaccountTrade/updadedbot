@@ -488,7 +488,7 @@ if (!matchedTrade) {
   this.portfolio.trades.push(matchedTrade);
 }
       const position: Position = {
-        id: `sync-${symbol}-${Date.now()}`,
+        id: matchedTrade.id,
         originTradeId: matchedTrade?.id, // ✅ eşleşen trade ID’si
         symbol,
         side,
