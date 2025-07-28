@@ -20,9 +20,7 @@ class TradingBot {
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
-    if (this.config.tradeMode) {
-      binanceService.setTradeMode(this.config.tradeMode,this.config.leverage);
-    }
+    
     this.portfolio = {
       totalValue: this.config.simulationBalance,
       totalPnl: 0,
