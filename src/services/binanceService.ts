@@ -280,15 +280,24 @@ public setTradeMode(mode: 'spot' | 'futures'): void {
     ? 'https://fapi.binance.com'
     : 'https://api.binance.com';
   }
-private getEndpoint(pathMap: { spot: string; futures: string }): string {
-    return this.tradeMode === 'futures' ? pathMap.futures : pathMap.spot;
+private getEndpoint(pathMap: { spot?: string; futures?: string; forceSpot?: boolean }): string {
+  // Bazı endpoint’ler spot’ta çalışır, futures modunda olsak bile spot’tan çekilmeli
+  const useSpot = pathMap.forceSpot || this.tradeMode === 'spot';
+  const baseUrl = useSpot ? 'https://api.binance.com' : 'https://fapi.binance.com';
+  const path = useSpot ? pathMap.spot : pathMap.futures;
+
+  if (!path) {
+    throw new Error('Invalid endpoint: Missing path for selected mode.');
   }
 
+  return `${baseUrl}${path}`;
+}
+
   public async getMarketPrice(symbol: string): Promise<number> {
-  const endpoint = this.getEndpoint({
-    spot: '/api/v3/ticker/price',
-    futures: '/fapi/v1/ticker/price',
-  });
+ const endpoint = this.getEndpoint({
+  spot: '/api/v3/ticker/price',
+  forceSpot: true,
+});
   try {
     const ticker: any = await this.makeRequest(endpoint, { symbol });
     return parseFloat(ticker.price);
@@ -689,7 +698,7 @@ if (this.tradeMode === 'futures') {
     // seçili moda göre doğru endpoint
     const endpoint = this.getEndpoint({
       spot: '/api/v3/ticker/price',
-      futures: '/fapi/v1/ticker/price',
+      forceSpot: true, // 🔥 SPOT'tan çekmek güvenli
     });
     const ticker = await this.makeRequest(endpoint, { symbol });
     return parseFloat(ticker.price);
