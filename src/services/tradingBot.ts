@@ -655,7 +655,11 @@ class TradingBot {
       
       position.currentPrice = marketData.price;
       position.pnl = (marketData.price - position.entryPrice) * position.size * (position.side === 'LONG' ? 1 : -1);
-      position.pnlPercent = (position.pnl / (position.entryPrice * position.size)) * 100;
+      const entryNotional = position.entryPrice * position.size;
+const lev = this.config.tradeMode === 'futures' ? (this.config.leverage ?? 1) : 1;
+const marginUsed = this.config.tradeMode === 'futures' ? entryNotional / lev : entryNotional;
+
+position.pnlPercent = (position.pnl / marginUsed) * 100;
       
       // Priority 1: Check multi-exit levels (highest priority)
       const exitResult = await this.checkMultiExitLevels(position, marketData.price);
