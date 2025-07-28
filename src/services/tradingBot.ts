@@ -695,50 +695,65 @@ position.pnlPercent = (position.pnl / marginUsed) * 100;
     }
   }
 
-  private checkMarketRegimeExit(position: Position, marketData: MarketData, marketCondition: any, strategy: any): { shouldExit: boolean; reason: string } {
-    const { type, volatility, confidence } = marketCondition;
-    const positionAge = Date.now() - position.timestamp;
-    const ageInMinutes = positionAge / (1000 * 60);
-    
-    // High volatility regime - tighter exits
-    if (type === 'HIGH_VOLATILITY') {
-      if (Math.abs(position.pnlPercent) > 3) {
-        return { shouldExit: true, reason: 'HIGH_VOLATILITY_PROTECTION' };
-      }
+  private checkMarketRegimeExit(
+  position: Position,
+  marketData: MarketData,
+  marketCondition: any,
+  strategy: any
+): { shouldExit: boolean; reason: string } {
+  const { type, volatility, confidence } = marketCondition;
+  const positionAge = Date.now() - position.timestamp;
+  const ageInMinutes = positionAge / (1000 * 60);
+
+  // 🔄 Volatilite bazlı zarar limiti
+  const baseLossThreshold = -1.0;
+  const volatilityMultiplier = Math.max(0.8, Math.min(2.0, volatility * 50));
+  const adaptiveLossThreshold = baseLossThreshold * volatilityMultiplier;
+
+  const lossTooHigh = position.pnlPercent <= adaptiveLossThreshold;
+  const profitEnough = position.pnlPercent >= 0.5;
+
+  // High volatility regime - tighter exits
+  if (type === 'HIGH_VOLATILITY') {
+    if (Math.abs(position.pnlPercent) > 3) {
+      return { shouldExit: true, reason: 'HIGH_VOLATILITY_PROTECTION' };
     }
-    
-    // Uncertain market - exit on any reasonable profit
-    if (type === 'UNCERTAIN' && confidence < 0.4) {
-      if (position.pnlPercent > 0.5) {
-        return { shouldExit: true, reason: 'UNCERTAIN_MARKET_PROFIT_TAKE' };
-      }
-      if (position.pnlPercent < -1) {
-        return { shouldExit: true, reason: 'UNCERTAIN_MARKET_LOSS_CUT' };
-      }
-    }
-    
-    // Trending market - let winners run but cut losers quickly
-    if (type === 'TRENDING_UP' || type === 'TRENDING_DOWN') {
-      const isWithTrend = (type === 'TRENDING_UP' && position.side === 'LONG') || 
-                         (type === 'TRENDING_DOWN' && position.side === 'SHORT');
-      
-      if (!isWithTrend && position.pnlPercent < -1.5) {
-        return { shouldExit: true, reason: 'AGAINST_TREND_CUT' };
-      }
-    }
-    
-    // Sideways market - quick scalping exits
-    if (type === 'SIDEWAYS') {
-      if (position.pnlPercent > 1.5) {
-        return { shouldExit: true, reason: 'SIDEWAYS_SCALP_PROFIT' };
-      }
-      if (position.pnlPercent < -1) {
-        return { shouldExit: true, reason: 'SIDEWAYS_SCALP_LOSS' };
-      }
-    }
-    
-    return { shouldExit: false, reason: '' };
   }
+
+  // Uncertain market - exit on small gain or controlled loss
+  if (type === 'UNCERTAIN' && confidence < 0.4) {
+    if (profitEnough) {
+      return { shouldExit: true, reason: 'UNCERTAIN_MARKET_PROFIT_TAKE' };
+    }
+    if (lossTooHigh) {
+      return { shouldExit: true, reason: 'UNCERTAIN_MARKET_LOSS_CUT' };
+    }
+  }
+
+  // Trending market - cut quickly if against trend
+  if (type === 'TRENDING_UP' || type === 'TRENDING_DOWN') {
+    const isWithTrend =
+      (type === 'TRENDING_UP' && position.side === 'LONG') ||
+      (type === 'TRENDING_DOWN' && position.side === 'SHORT');
+
+    if (!isWithTrend && lossTooHigh) {
+      return { shouldExit: true, reason: 'AGAINST_TREND_CUT' };
+    }
+  }
+
+  // Sideways market - scalp logic
+  if (type === 'SIDEWAYS') {
+    if (position.pnlPercent > 1.5) {
+      return { shouldExit: true, reason: 'SIDEWAYS_SCALP_PROFIT' };
+    }
+    if (lossTooHigh) {
+      return { shouldExit: true, reason: 'SIDEWAYS_SCALP_LOSS' };
+    }
+  }
+
+  return { shouldExit: false, reason: '' };
+}
+
 
   private checkTimeBasedExit(position: Position, marketData: MarketData): { shouldExit: boolean; reason: string } {
     const positionAge = Date.now() - position.timestamp;
