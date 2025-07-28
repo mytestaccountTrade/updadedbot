@@ -816,68 +816,19 @@ class TradingBot {
 
   return { shouldExit: false, reason: '' };
 }
-private atrCache: Record<string, { value: number; timestamp: number }> = {};
- 
-private async calculateATR(symbol: string): Promise<number> {
-  const now = Date.now();
-  const cache = this.atrCache[symbol];
-  if (cache && now - cache.timestamp < 30_000) {
-    return cache.value;
-  }
 
-  try {
-    let candles: any[] = [];
-
-    if (this.config.mode === 'REAL') {
-      const endpoint =
-        this.config.tradeMode === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
-      const params = { symbol, interval: '1m', limit: 15 };
-      candles = await binanceService.makeRequest(endpoint, params);
-    } else {
-      const data =
-        (this as any).marketDataCache?.[symbol]?.candles || [];
-      candles = data.slice(-15);
-    }
-
-    if (!candles || candles.length < 2) {
-      return 0;
-    }
-
-    let atr = 0;
-    let prevClose = parseFloat(candles[0][4] ?? candles[0].close);
-    for (let i = 1; i < candles.length; i++) {
-      const candle = candles[i];
-      const high = parseFloat(candle[2] ?? candle.high);
-      const low = parseFloat(candle[3] ?? candle.low);
-      const close = parseFloat(candle[4] ?? candle.close);
-      const tr = Math.max(
-        high - low,
-        Math.abs(high - prevClose),
-        Math.abs(low - prevClose)
-      );
-      atr += tr;
-      prevClose = close;
-    }
-    atr = atr / (candles.length - 1);
-
-    this.atrCache[symbol] = { value: atr, timestamp: now };
-    return atr;
-  } catch (error) {
-    console.error('ATR calculation error:', error);
-    return 0;
-  }
-}
-  
-  private async checkMultiExitLevels(
+  private checkMultiExitLevels(
   position: Position,
   currentPrice: number
-): Promise<{ shouldExit: boolean; reason: string }> {
+): { shouldExit: boolean; reason: string } {
+  // Exit verilerini al veya oluştur
   let exitData: any = this.multiExitPositions.get(position.id);
   if (!exitData) {
     const exitLevels = adaptiveStrategy.getMultiExitLevels(
       position.entryPrice,
       position.side
     );
+    // peakPrice = giriş fiyatı, trailing henüz etkin değil
     exitData = {
       tp1Hit: false,
       tp2Hit: false,
@@ -895,6 +846,7 @@ private async calculateATR(symbol: string): Promise<number> {
   );
   const isLong = position.side === 'LONG';
 
+  // 1️⃣ Stop-loss kontrolü (her zaman öncelikli)
   if (
     (isLong && currentPrice <= exitData.trailingSL) ||
     (!isLong && currentPrice >= exitData.trailingSL)
@@ -902,35 +854,39 @@ private async calculateATR(symbol: string): Promise<number> {
     return { shouldExit: true, reason: 'TRAILING_STOP_LOSS' };
   }
 
+  // 2️⃣ TP1 kontrolü
   if (!exitData.tp1Hit) {
     const tp1Hit =
       (isLong && currentPrice >= exitLevels.tp1) ||
       (!isLong && currentPrice <= exitLevels.tp1);
     if (tp1Hit) {
       exitData.tp1Hit = true;
+      // Breakeven’e taşın
       exitData.trailingSL = position.entryPrice;
       console.log(
-        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(
-          2
-        )} - trailing SL moved to breakeven`
+        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`
       );
       return { shouldExit: true, reason: 'TP1_REACHED' };
     }
-  } else if (!exitData.tp2Hit) {
+  }
+  // 3️⃣ TP2 kontrolü
+  else if (!exitData.tp2Hit) {
     const tp2Hit =
       (isLong && currentPrice >= exitLevels.tp2) ||
       (!isLong && currentPrice <= exitLevels.tp2);
     if (tp2Hit) {
       exitData.tp2Hit = true;
+      // SL’yi TP1 seviyesine taşı
       exitData.trailingSL = exitLevels.tp1;
       console.log(
-        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(
-          2
-        )} - trailing SL moved to TP1`
+        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`
       );
       return { shouldExit: true, reason: 'TP2_REACHED' };
     }
-  } else {
+  }
+  // 4️⃣ TP3 veya trailing stop kontrolü
+  else {
+    // Son TP hedefi – direkt çıkış
     const atTP3 =
       (isLong && currentPrice >= exitLevels.tp3) ||
       (!isLong && currentPrice <= exitLevels.tp3);
@@ -938,39 +894,35 @@ private async calculateATR(symbol: string): Promise<number> {
       return { shouldExit: true, reason: 'TP3_FINAL_EXIT' };
     }
 
-    const startTrailPct = 0.02;
-    const startTrail =
+    // Trailing stop’u başlatmak için fiyattaki +2% eşiği (opsiyonel)
+    const startTrailPct = 0.02; // +2%
+    const trailStartTriggered =
       exitData.trailActivated ||
-      (isLong && currentPrice >= exitLevels.tp2 * (1 + startTrailPct)) ||
-      (!isLong && currentPrice <= exitLevels.tp2 * (1 - startTrailPct));
+      (isLong &&
+        currentPrice >= exitLevels.tp2 * (1 + startTrailPct)) ||
+      (!isLong &&
+        currentPrice <= exitLevels.tp2 * (1 - startTrailPct));
 
-    if (startTrail) {
+    if (trailStartTriggered) {
       exitData.trailActivated = true;
 
+      // Favorable hareketlerde yeni zirveyi kaydet
       if (isLong) {
         exitData.peakPrice = Math.max(exitData.peakPrice, currentPrice);
       } else {
         exitData.peakPrice = Math.min(exitData.peakPrice, currentPrice);
       }
 
-      let trailDistance: number = 0;
-      let atrValue = 0;
-      const cached = this.atrCache[position.symbol];
-      if (cached) atrValue = cached.value;
-      this.calculateATR(position.symbol).catch(() => {});
+      // Dinamik trailing mesafesi (ATR’ye göre ayarlanabilir, yoksa sabit)
+      const trailPct =
+        this.config.trailingStopPercent !== undefined
+          ? this.config.trailingStopPercent
+          : 0.015;
 
-      const fallbackDist =
-        (this.config.trailingStopPercent || 0.015) * currentPrice;
-      trailDistance = Math.max(atrValue, fallbackDist);
-      console.log(
-        `Using ATR (${atrValue.toFixed(
-          4
-        )}) as trailing stop distance for ${position.symbol}`
-      );
-
+      // Zirve üzerinden trailing SL hesapla ve sadece iyileştir
       const proposedSL = isLong
-        ? exitData.peakPrice - trailDistance
-        : exitData.peakPrice + trailDistance;
+        ? exitData.peakPrice * (1 - trailPct)
+        : exitData.peakPrice * (1 + trailPct);
 
       if (
         (isLong && proposedSL > exitData.trailingSL) ||
