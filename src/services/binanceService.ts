@@ -173,9 +173,9 @@ class BinanceService {
     return this.apiKey.length > 0 && this.apiSecret.length > 0;
   }
 
-  private getBaseUrl(): string {
-  return this.tradeMode === 'futures' ? 'https://fapi.binance.com' : 'https://api.binance.com';
-}
+   private getBaseUrl(): string {
+    return this.isTestnet ? this.testnetUrl : this.baseUrl;
+  }
 
 
   public async makeRequest(endpoint: string, params: any = {}, method: string = 'GET'): Promise<any> {
