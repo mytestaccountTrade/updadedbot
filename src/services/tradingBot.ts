@@ -224,7 +224,7 @@ class TradingBot {
     (globalThis as any).fastLearningMode = this.config.fastLearningMode;
     
     logService.info('botStarted', { mode: this.config.mode });
-    
+    logService.info('Trade Mode', { mode: this.config.tradeMode });
     // Subscribe to WebSocket data for top trading pairs
     this.initializeWebSocketSubscriptions();
     
