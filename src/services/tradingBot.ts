@@ -960,7 +960,7 @@ private async checkMultiExitLevels(
       let atrValue = 0;
       const cached = this.atrCache[position.symbol];
       if (cached) atrValue = cached.value;
-      const atrValue = await this.calculateATR(position.symbol); // 🔥 bu şekilde
+       atrValue = await this.calculateATR(position.symbol); // 🔥 bu şekilde
 
       const fallbackDist =
         (this.config.trailingStopPercent || 0.015) * currentPrice;
