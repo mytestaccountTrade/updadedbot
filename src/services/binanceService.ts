@@ -148,8 +148,14 @@ class BinanceService {
     return { valid: false, error: `Invalid or missing market price for ${symbol}` };
   }
 
-  if (adjustedQty * currentPrice < symbolInfo.minNotional) {
-    return { valid: false, error: `Order value below minimum notional: ${symbolInfo.minNotional}` };
+  const leverage = this.leverage ?? 1;
+  const notionalValue = adjustedQty * currentPrice * leverage;
+
+  if (notionalValue < symbolInfo.minNotional) {
+    return {
+      valid: false,
+      error: `Order value below minimum notional: ${symbolInfo.minNotional}`
+    };
   }
 
   return { valid: true, adjustedQty };
