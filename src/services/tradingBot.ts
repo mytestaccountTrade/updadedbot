@@ -462,9 +462,15 @@ class TradingBot {
 
       const pnl = unrealizedProfit;
       const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
-
+      const matchedTrade = this.portfolio.trades.find(t =>
+  t.symbol === symbol &&
+  t.side === side &&
+  !t.exitPrice &&
+  Math.abs(t.entryPrice - entryPrice) < 0.01 // toleranslı eşleşme
+);
       const position: Position = {
         id: `sync-${symbol}-${Date.now()}`,
+        originTradeId: matchedTrade?.id, // ✅ eşleşen trade ID’si
         symbol,
         side,
         size,
@@ -1372,7 +1378,9 @@ this.portfolio.availableBalance -= balanceDeduction;
   const closeTimestamp = Date.now();
 
   // Açılış trade'ini bul
-  const originalTrade = this.portfolio.trades.find(t => t.id === position.id);
+ const originalTrade = this.portfolio.trades.find(t =>
+  t.id === position.id || t.id === position.originTradeId
+);
     
   if (!originalTrade) {
     console.warn(`🔍 No original trade found for position ID ${position.id}. Skipping close.`);
