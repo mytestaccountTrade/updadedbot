@@ -429,37 +429,31 @@ class TradingBot {
  private async syncRealPositions() {
   if (this.config.mode !== 'REAL' || this.config.tradeMode !== 'futures') return;
 
-   try {
+  try {
     const openPositions = await binanceService.getOpenPositions();
     console.log(`🔄 Synced ${openPositions.length} real positions`);
 
     for (const pos of openPositions) {
-      const rawAmt = parseFloat(pos.positionAmt);
-      const entry = parseFloat(pos.entryPrice || '0');
-      const mark = parseFloat(pos.markPrice || pos.entryPrice || '0');
+      const { symbol, size, entryPrice, currentPrice, side, unrealizedProfit, leverage } = pos;
 
-      const size = Math.abs(rawAmt);
-      const side = rawAmt > 0 ? 'LONG' : rawAmt < 0 ? 'SHORT' : null;
-
-      if (!side || size === 0 || !entry || !mark || isNaN(size) || isNaN(entry) || isNaN(mark)) {
-        console.warn(`⚠️ Skipping position: symbol=${pos.symbol}, size=${rawAmt}, entry=${entry}, mark=${mark}`);
+      if (!symbol || !entryPrice || !currentPrice || !side || size <= 0 || isNaN(size)) {
+        console.warn(`⚠️ Skipping invalid position: symbol=${symbol}, size=${size}`);
         continue;
       }
 
-      const entryNotional = entry * size;
-      const lev = this.config.leverage ?? 1;
-      const marginUsed = lev > 0 ? entryNotional / lev : entryNotional;
+      const entryNotional = entryPrice * size;
+      const marginUsed = leverage > 0 ? entryNotional / leverage : entryNotional;
 
-      const pnl = (mark - entry) * size * (side === 'LONG' ? 1 : -1);
+      const pnl = unrealizedProfit;
       const pnlPercent = marginUsed !== 0 ? (pnl / marginUsed) * 100 : 0;
 
       const position: Position = {
-        id: `sync-${pos.symbol}-${Date.now()}`,
-        symbol: pos.symbol,
+        id: `sync-${symbol}-${Date.now()}`,
+        symbol,
         side,
         size,
-        entryPrice: entry,
-        currentPrice: mark,
+        entryPrice,
+        currentPrice,
         positionType: side,
         pnl,
         pnlPercent,
@@ -467,9 +461,8 @@ class TradingBot {
       };
 
       this.portfolio.positions.push(position);
-      this.activePositionIds.add(pos.symbol);
+      this.activePositionIds.add(symbol);
     }
-
   } catch (error) {
     console.error('❌ Failed to sync real positions:', error);
   }
