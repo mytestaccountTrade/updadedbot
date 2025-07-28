@@ -695,6 +695,20 @@ public async getBalance(): Promise<any> {
   }
 }
 
+async getOrderStatus(symbol: string, orderId: string): Promise<'FILLED' | 'PENDING' | 'CANCELLED'> {
+  try {
+    const endpoint = this.getEndpoint({
+      spot: '/api/v3/order',
+      futures: '/fapi/v1/order',
+    });
+    const result = await this.makeRequest(endpoint, { symbol, orderId }, 'GET');
+    return this.mapBinanceStatus(result.status);
+  } catch (error) {
+    console.error(`❌ Failed to fetch order status:`, error);
+    return 'PENDING'; // Default to pending if failed
+  }
+}
+  
 private mapBinanceStatus(rawStatus: string): 'FILLED' | 'PENDING' | 'CANCELLED' {
   if (rawStatus === 'FILLED') return 'FILLED';
   if (rawStatus === 'CANCELED' || rawStatus === 'EXPIRED' || rawStatus === 'REJECTED') return 'CANCELLED';
