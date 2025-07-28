@@ -52,9 +52,7 @@ class BinanceService {
   constructor() {
   this.apiKey = '';
   this.apiSecret = '';
-  this.baseUrl = this.tradeMode === 'futures'
-  ? 'https://fapi.binance.com'
-  : 'https://api.binance.com';
+  this.baseUrl = 'https://api.binance.com';
   this.testnetUrl = 'https://testnet.binance.vision'; // ✅
   this.isTestnet = false;
   this.initializeSymbols();
