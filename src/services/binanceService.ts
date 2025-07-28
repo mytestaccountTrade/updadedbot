@@ -650,7 +650,7 @@ const result = await this.makeRequest(endpoint, params, 'POST');
         type: params.type,
         quantity: validation.adjustedQty!,
         price: price || parseFloat(result.fills?.[0]?.price || '0'),
-        status: result.status === 'FILLED' ? 'FILLED' : 'PENDING',
+        status: this.mapBinanceStatus(result.status), // 🧠 yeni bir helper fonksiyon
         timestamp: Date.now(),
       };
     } catch (error) {
@@ -658,7 +658,11 @@ const result = await this.makeRequest(endpoint, params, 'POST');
       return null;
     }
   }
-
+private mapBinanceStatus(rawStatus: string): 'FILLED' | 'PENDING' | 'CANCELLED' {
+  if (rawStatus === 'FILLED') return 'FILLED';
+  if (rawStatus === 'CANCELED' || rawStatus === 'EXPIRED' || rawStatus === 'REJECTED') return 'CANCELLED';
+  return 'PENDING'; // 'NEW', 'PARTIALLY_FILLED', vb.
+}
   async getAccountInfo(): Promise<{ totalWalletBalance: number } | null> {
     try {
       if (!this.hasValidCredentials()) {
