@@ -65,7 +65,7 @@ class BinanceService {
   }
 
   private async initializeSymbols() {
-  const isFutures = this.config.tradeMode === 'futures';
+  const isFutures = this.tradeMode === 'futures';
   const endpoint = isFutures ? '/fapi/v1/exchangeInfo' : '/api/v3/exchangeInfo';
 
   try {
