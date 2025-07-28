@@ -48,20 +48,34 @@ export const TradesHistory: React.FC<TradesHistoryProps> = ({ trades }) => {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('time')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('symbol')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('side')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('type')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('quantity')}</th>
-            <th className="text-left py-3 px-4">{t('entryPrice')}</th>
-            <th className="text-left py-3 px-4">{t('exitPrice')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('positionSize')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">{t('duration')}</th>    
-          </tr>
-        </thead>
+  <tr className="border-b border-gray-200">
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('time')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('symbol')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('side')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('type')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('quantity')}</th>
+    
+    {/* 👇 Yeni alanlar */}
+    {config.tradeMode === 'futures' ? (
+      <>
+        <th className="text-left py-3 px-4 font-medium text-gray-600">{t('invested')}</th>
+        <th className="text-left py-3 px-4 font-medium text-gray-600">{t('notional')}</th>
+      </>
+    ) : (
+      <>
+        <th className="text-left py-3 px-4 font-medium text-gray-600">{t('notional')}</th>
+        <th className="text-left py-3 px-4 font-medium text-gray-600">-</th>
+      </>
+    )}
+
+    <th className="text-left py-3 px-4">{t('entryPrice')}</th>
+    <th className="text-left py-3 px-4">{t('exitPrice')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('positionSize')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('status')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('profit')}</th>
+    <th className="text-left py-3 px-4 font-medium text-gray-600">{t('duration')}</th>
+  </tr>
+</thead>
         <tbody>
           {paginatedTrades.map((trade) => {
   const notional = trade.quantity * trade.price;
