@@ -2,6 +2,7 @@ import { MarketData, Position, Trade } from '../types/trading';
 
 export interface MarketCondition {
   type: 'TRENDING_UP' | 'TRENDING_DOWN' | 'SIDEWAYS' | 'UNCERTAIN' | 'HIGH_VOLATILITY';
+  marketTrend: 'UP' | 'DOWN' | 'SIDEWAYS' | 'UNKNOWN';
   confidence: number;
   volatility: number;
   volume: number;
@@ -27,6 +28,8 @@ export interface TradePattern {
     emaTrend: string;
     bollingerPosition: string;
     timeOfDay: string;
+    // NEW
+    marketTrend?: 'UP' | 'DOWN' | 'SIDEWAYS';
   };
   outcome: {
     winRate: number;
@@ -110,7 +113,7 @@ class AdaptiveStrategyService {
   }
 
   analyzeMarketCondition(marketData: MarketData): MarketCondition {
-  const { rsi, macd, volumeRatio, emaTrend, bollinger, price } = marketData;
+  const { rsi, macd, volumeRatio, emaTrend, bollinger } = marketData;
 
   // Volatilite hesapla
   const volatility = bollinger
@@ -142,15 +145,19 @@ class AdaptiveStrategyService {
   else if (macd < -0.001) scoreTrendingDown += 1;
   else scoreSideways += 1;
 
-  if (volumeRatio > 1.2) {
-    scoreTrendingUp += 0.5;
-    scoreTrendingDown += 0.5;
+  // Volume yorumlama
+  if (volumeRatio > 1.5) {
+    scoreTrendingUp += 1;
+  } else if (volumeRatio < 0.8) {
+    scoreTrendingDown += 1;
+  } else {
+    scoreSideways += 0.5;
   }
 
   if (volatility < 0.02) scoreSideways += 1;
-  else if (volatility > 0.05) confidence += 0.2; // volatil piyasada güven yüksekse daha cesur olabiliriz
+  else if (volatility > 0.05) confidence += 0.2;
 
-  // En yüksek skor kazansın
+  // En yüksek skora göre trend belirleme
   let type: MarketCondition['type'] = 'UNCERTAIN';
   const maxScore = Math.max(scoreTrendingUp, scoreTrendingDown, scoreSideways);
 
@@ -158,7 +165,8 @@ class AdaptiveStrategyService {
     if (scoreTrendingUp === maxScore) type = 'TRENDING_UP';
     else if (scoreTrendingDown === maxScore) type = 'TRENDING_DOWN';
     else if (scoreSideways === maxScore) type = 'SIDEWAYS';
-    confidence = 0.7 + (maxScore / 5) * 0.2; // max 0.9 confidence
+
+    confidence = 0.7 + (maxScore / 5) * 0.2;
   } else if (volatility > 0.05) {
     type = 'HIGH_VOLATILITY';
     confidence = 0.8;
@@ -167,8 +175,15 @@ class AdaptiveStrategyService {
     confidence = 0.3;
   }
 
+  const marketTrend: MarketCondition['marketTrend'] =
+    type === 'TRENDING_UP' ? 'UP' :
+    type === 'TRENDING_DOWN' ? 'DOWN' :
+    type === 'SIDEWAYS' ? 'SIDEWAYS' :
+    'UNKNOWN';
+
   return {
     type,
+    marketTrend,
     confidence: Math.min(confidence, 0.95),
     volatility,
     volume: volumeRatio,
@@ -396,171 +411,263 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
   }
 
   recordTradeOutcome(trade: Trade, position: Position, marketData: MarketData) {
-    const isWin = position.pnl > 0;
-    const outcome = isWin ? 'WIN' : 'LOSS';
-    
-    // Update recent trades
-    this.recentTrades.push({
-      outcome,
-      timestamp: Date.now(),
-      profit: position.pnl
-    });
+  const isWin = position.pnl > 0;
+  const outcome = isWin ? 'WIN' : 'LOSS';
+  
+  // Update recent trades
+  this.recentTrades.push({
+    outcome,
+    timestamp: Date.now(),
+    profit: position.pnl
+  });
 
-    // Keep only last 20 trades for recent analysis
-    if (this.recentTrades.length > 20) {
-      this.recentTrades = this.recentTrades.slice(-20);
-    }
-
-    // Update risk metrics
-    this.riskMetrics.totalTrades++;
-    if (isWin) {
-      this.riskMetrics.profitableTrades++;
-      this.riskMetrics.consecutiveLosses = 0;
-    } else {
-      this.riskMetrics.consecutiveLosses++;
-    }
-
-    // Calculate recent win rate
-    const recentWins = this.recentTrades.filter(t => t.outcome === 'WIN').length;
-    this.riskMetrics.recentWinRate = this.recentTrades.length > 0 ? recentWins / this.recentTrades.length : 0.5;
-
-    // Risk adjustments
-    if (this.riskMetrics.recentWinRate < 0.4) {
-      this.riskMetrics.currentRiskLevel = Math.max(0.3, this.riskMetrics.currentRiskLevel * 0.8);
-      console.log(`🔻 Risk reduced to ${(this.riskMetrics.currentRiskLevel * 100).toFixed(0)}% due to low win rate`);
-    } else if (this.riskMetrics.recentWinRate > 0.6) {
-      this.riskMetrics.currentRiskLevel = Math.min(1.5, this.riskMetrics.currentRiskLevel * 1.1);
-      console.log(`🔺 Risk increased to ${(this.riskMetrics.currentRiskLevel * 100).toFixed(0)}% due to high win rate`);
-    }
-
-    // Cooldown trigger
-    if (this.riskMetrics.consecutiveLosses >= 5) {
-      this.riskMetrics.lastCooldownEnd = Date.now() + (60 * 60 * 1000); // 1 hour cooldown
-      console.log(`🛑 Trading paused for 1 hour after 5 consecutive losses`);
-    }
-
-    // Learn from profitable trades
-    if (isWin && position.pnlPercent > 1) {
-      this.learnFromProfitableTrade(trade, position, marketData);
-    }
-
-    // Generate trade reflection
-    this.generateTradeReflection(trade, position, marketData, outcome);
-
-    this.saveStoredData();
+  // Keep only last 20 trades
+  if (this.recentTrades.length > 20) {
+    this.recentTrades = this.recentTrades.slice(-20);
   }
 
+  // Update risk metrics
+  this.riskMetrics.totalTrades++;
+  if (isWin) {
+    this.riskMetrics.profitableTrades++;
+    this.riskMetrics.consecutiveLosses = 0;
+  } else {
+    this.riskMetrics.consecutiveLosses++;
+  }
+
+  // Calculate recent win rate
+  const recentWins = this.recentTrades.filter(t => t.outcome === 'WIN').length;
+  this.riskMetrics.recentWinRate = this.recentTrades.length > 0
+    ? recentWins / this.recentTrades.length
+    : 0.5;
+
+  // Risk level adjustment
+  if (this.riskMetrics.recentWinRate < 0.4) {
+    this.riskMetrics.currentRiskLevel = Math.max(0.3, this.riskMetrics.currentRiskLevel * 0.8);
+    console.log(`🔻 Risk reduced to ${(this.riskMetrics.currentRiskLevel * 100).toFixed(0)}% due to low win rate`);
+  } else if (this.riskMetrics.recentWinRate > 0.6) {
+    this.riskMetrics.currentRiskLevel = Math.min(1.5, this.riskMetrics.currentRiskLevel * 1.1);
+    console.log(`🔺 Risk increased to ${(this.riskMetrics.currentRiskLevel * 100).toFixed(0)}% due to high win rate`);
+  }
+
+  // Cooldown
+  if (this.riskMetrics.consecutiveLosses >= 5) {
+    this.riskMetrics.lastCooldownEnd = Date.now() + (60 * 60 * 1000); // 1 hour
+    console.log(`🛑 Trading paused for 1 hour after 5 consecutive losses`);
+  }
+
+  // Learn from profitable or losing trades
+  if (isWin && position.pnlPercent > 1) {
+    this.learnFromProfitableTrade(trade, position, marketData);
+  } else if (!isWin && position.pnlPercent < -1) {
+    this.learnFromLosingTrade(trade, position, marketData); // 👈 ekleyeceğimiz fonksiyon
+  }
+
+  // Reflection
+  this.generateTradeReflection(trade, position, marketData, outcome);
+
+  this.saveStoredData();
+}
+private learnFromLosingTrade(trade: Trade, position: Position, marketData: MarketData) {
+  const hour = new Date(trade.timestamp).getUTCHours();
+  let timeOfDay: string;
+  if (hour >= 0 && hour < 6) timeOfDay = 'ASIAN';
+  else if (hour >= 6 && hour < 14) timeOfDay = 'EUROPEAN';
+  else if (hour >= 14 && hour < 22) timeOfDay = 'AMERICAN';
+  else timeOfDay = 'OVERNIGHT';
+
+  const bollingerPosition = this.getBollingerPosition(marketData);
+  const duration = Date.now() - trade.timestamp;
+
+  const pattern: TradePattern = {
+    id: `pattern_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    conditions: {
+      rsi: { min: marketData.rsi - 5, max: marketData.rsi + 5 },
+      macd: { min: marketData.macd - 0.002, max: marketData.macd + 0.002 },
+      volumeRatio: { min: marketData.volumeRatio - 0.3, max: marketData.volumeRatio + 0.3 },
+      emaTrend: marketData.emaTrend,
+      bollingerPosition,
+      timeOfDay
+    },
+    outcome: {
+      winRate: 0.0,
+      avgProfit: position.pnlPercent, // negatif değer
+      avgDuration: duration,
+      tradeCount: 1
+    },
+    lastUsed: Date.now(),
+    profitability: position.pnlPercent / 100
+  };
+
+  // Mevcut benzer bir kayıp örüntüsü var mı?
+  const existingPattern = this.learnedPatterns.find(p => 
+    this.patternsAreSimilar(p, pattern) && p.outcome.winRate <= 0.3
+  );
+
+  if (existingPattern) {
+    existingPattern.outcome.tradeCount++;
+    existingPattern.outcome.avgProfit =
+      ((existingPattern.outcome.avgProfit * (existingPattern.outcome.tradeCount - 1)) + position.pnlPercent)
+      / existingPattern.outcome.tradeCount;
+
+    existingPattern.outcome.avgDuration =
+      ((existingPattern.outcome.avgDuration * (existingPattern.outcome.tradeCount - 1)) + duration)
+      / existingPattern.outcome.tradeCount;
+
+    existingPattern.lastUsed = Date.now();
+    existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
+  } else {
+    this.learnedPatterns.push(pattern);
+    console.log(`⚠️ New losing pattern recorded: ${trade.symbol} ${trade.side} (${position.pnlPercent.toFixed(2)}%)`);
+  }
+
+  // En fazla 50 örüntü sakla
+  this.learnedPatterns.sort((a, b) => b.profitability - a.profitability);
+  if (this.learnedPatterns.length > 50) {
+    this.learnedPatterns = this.learnedPatterns.slice(0, 50);
+  }
+}
   private learnFromProfitableTrade(trade: Trade, position: Position, marketData: MarketData) {
-    const hour = new Date(trade.timestamp).getUTCHours();
-    let timeOfDay: string;
-    if (hour >= 0 && hour < 6) timeOfDay = 'ASIAN';
-    else if (hour >= 6 && hour < 14) timeOfDay = 'EUROPEAN';
-    else if (hour >= 14 && hour < 22) timeOfDay = 'AMERICAN';
-    else timeOfDay = 'OVERNIGHT';
+  const hour = new Date(trade.timestamp).getUTCHours();
+  const timeOfDay = hour < 6 ? 'ASIAN' :
+                    hour < 14 ? 'EUROPEAN' :
+                    hour < 22 ? 'AMERICAN' : 'OVERNIGHT';
 
-    const bollingerPosition = this.getBollingerPosition(marketData);
-    const duration = Date.now() - trade.timestamp;
+  const bollingerPosition = this.getBollingerPosition(marketData);
+  const duration = Date.now() - trade.timestamp;
 
-    const pattern: TradePattern = {
-      id: `pattern_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      conditions: {
-        rsi: { min: marketData.rsi - 5, max: marketData.rsi + 5 },
-        macd: { min: marketData.macd - 0.002, max: marketData.macd + 0.002 },
-        volumeRatio: { min: marketData.volumeRatio - 0.3, max: marketData.volumeRatio + 0.3 },
-        emaTrend: marketData.emaTrend,
-        bollingerPosition,
-        timeOfDay
+  // Güncel market koşulunu al
+  const marketCondition = this.analyzeMarketCondition(marketData);
+
+  const pattern: TradePattern = {
+    id: `pattern_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    conditions: {
+      rsi: {
+        min: Math.max(0, marketData.rsi - 5),
+        max: Math.min(100, marketData.rsi + 5)
       },
-      outcome: {
-        winRate: 1.0,
-        avgProfit: position.pnlPercent,
-        avgDuration: duration,
-        tradeCount: 1
+      macd: {
+        min: marketData.macd - 0.002,
+        max: marketData.macd + 0.002
       },
-      lastUsed: Date.now(),
-      profitability: position.pnlPercent / 100
-    };
+      volumeRatio: {
+        min: Math.max(0, marketData.volumeRatio - 0.3),
+        max: marketData.volumeRatio + 0.3
+      },
+      emaTrend: marketData.emaTrend,
+      bollingerPosition,
+      timeOfDay,
+      marketTrend: marketCondition.marketTrend
+    },
+    outcome: {
+      winRate: 1.0,
+      avgProfit: position.pnlPercent,
+      avgDuration: duration,
+      tradeCount: 1
+    },
+    lastUsed: Date.now(),
+    profitability: position.pnlPercent / 100
+  };
 
-    // Check if similar pattern exists
-    const existingPattern = this.learnedPatterns.find(p => 
-      this.patternsAreSimilar(p, pattern)
-    );
+  const existingPattern = this.learnedPatterns.find(p =>
+    this.patternsAreSimilar(p, pattern)
+  );
 
-    if (existingPattern) {
-      // Update existing pattern
-      existingPattern.outcome.tradeCount++;
-      existingPattern.outcome.avgProfit =
-  ((existingPattern.outcome.avgProfit * (existingPattern.outcome.tradeCount - 1)) + position.pnlPercent)
-  / existingPattern.outcome.tradeCount;
+  if (existingPattern) {
+    const prevCount = existingPattern.outcome.tradeCount;
 
-existingPattern.outcome.avgDuration =
-  ((existingPattern.outcome.avgDuration * (existingPattern.outcome.tradeCount - 1)) + duration)
-  / existingPattern.outcome.tradeCount;
-      existingPattern.lastUsed = Date.now();
-      existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
-    } else {
-      // Add new pattern
-      this.learnedPatterns.push(pattern);
-      console.log(`🧠 New profitable pattern learned: ${trade.symbol} ${trade.side} (+${position.pnlPercent.toFixed(2)}%)`);
-    }
+    existingPattern.outcome.tradeCount++;
+    existingPattern.outcome.avgProfit =
+      (existingPattern.outcome.avgProfit * prevCount + position.pnlPercent)
+      / (prevCount + 1);
 
-    // Keep only top 50 patterns
-    this.learnedPatterns.sort((a, b) => b.profitability - a.profitability);
-    if (this.learnedPatterns.length > 50) {
-      this.learnedPatterns = this.learnedPatterns.slice(0, 50);
-    }
+    existingPattern.outcome.avgDuration =
+      (existingPattern.outcome.avgDuration * prevCount + duration)
+      / (prevCount + 1);
+
+    existingPattern.lastUsed = Date.now();
+    existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
+  } else {
+    this.learnedPatterns.push(pattern);
+    console.log(`🧠 New profitable pattern learned: ${trade.symbol} ${trade.side} (+${position.pnlPercent.toFixed(2)}%)`);
   }
+
+  // Keep only top 50 patterns
+  this.learnedPatterns.sort((a, b) => b.profitability - a.profitability);
+  this.learnedPatterns = this.learnedPatterns.slice(0, 50);
+}
 
   private patternsAreSimilar(p1: TradePattern, p2: TradePattern): boolean {
-    return (
-      Math.abs(p1.conditions.rsi.min - p2.conditions.rsi.min) < 10 &&
-      Math.abs(p1.conditions.rsi.max - p2.conditions.rsi.max) < 10 &&
-      p1.conditions.emaTrend === p2.conditions.emaTrend &&
-      p1.conditions.bollingerPosition === p2.conditions.bollingerPosition &&
-      p1.conditions.timeOfDay === p2.conditions.timeOfDay
-    );
+  return (
+    Math.abs(p1.conditions.rsi.min - p2.conditions.rsi.min) <= 10 &&
+    Math.abs(p1.conditions.rsi.max - p2.conditions.rsi.max) <= 10 &&
+    Math.abs(p1.conditions.macd.min - p2.conditions.macd.min) <= 0.003 &&
+    Math.abs(p1.conditions.macd.max - p2.conditions.macd.max) <= 0.003 &&
+    Math.abs(p1.conditions.volumeRatio.min - p2.conditions.volumeRatio.min) <= 0.4 &&
+    Math.abs(p1.conditions.volumeRatio.max - p2.conditions.volumeRatio.max) <= 0.4 &&
+    p1.conditions.emaTrend === p2.conditions.emaTrend &&
+    p1.conditions.bollingerPosition === p2.conditions.bollingerPosition &&
+    p1.conditions.timeOfDay === p2.conditions.timeOfDay &&
+    p1.conditions.marketTrend === p2.conditions.marketTrend
+  );
+}
+
+
+  private generateTradeReflection(
+  trade: Trade,
+  position: Position,
+  marketData: MarketData,
+  outcome: 'WIN' | 'LOSS'
+) {
+  const duration = Date.now() - trade.timestamp;
+
+  const reflection = {
+    timestamp: Date.now(),
+    trade: {
+      symbol: trade.symbol,
+      side: trade.side,
+      pnl: position.pnl,
+      pnlPercent: position.pnlPercent,
+      duration
+    },
+    reflection: this.createReflectionText(trade, position, marketData, outcome, duration)
+  };
+
+  this.tradeReflections.push(reflection);
+
+  // Keep only last 10 reflections
+  if (this.tradeReflections.length > 10) {
+    this.tradeReflections.splice(0, this.tradeReflections.length - 10);
   }
 
-  private generateTradeReflection(trade: Trade, position: Position, marketData: MarketData, outcome: 'WIN' | 'LOSS') {
-    const reflection = {
-      timestamp: Date.now(),
-      trade: {
-        symbol: trade.symbol,
-        side: trade.side,
-        pnl: position.pnl,
-        pnlPercent: position.pnlPercent,
-        duration: Date.now() - trade.timestamp
-      },
-      reflection: this.createReflectionText(trade, position, marketData, outcome)
-    };
+  console.log(`💭 Trade Reflection: ${reflection.reflection}`);
+}
 
-    this.tradeReflections.push(reflection);
+  private createReflectionText(
+  trade: Trade,
+  position: Position,
+  marketData: MarketData,
+  outcome: 'WIN' | 'LOSS',
+  durationMs: number
+): string {
+  const { rsi, macd, emaTrend, volumeRatio } = marketData;
+  const durationMin = durationMs / 60000;
 
-    // Keep only last 10 reflections
-    if (this.tradeReflections.length > 10) {
-      this.tradeReflections = this.tradeReflections.slice(-10);
-    }
+  if (outcome === 'WIN') {
+    return `✅ ${trade.symbol} ${trade.side} worked (+${position.pnlPercent.toFixed(2)}% in ${durationMin.toFixed(0)}m). RSI ${rsi.toFixed(1)}, MACD ${macd.toFixed(4)}, ${emaTrend} trend, volume ${volumeRatio.toFixed(1)}x. Worth remembering.`;
+  } else {
+    const reasons: string[] = [];
 
-    console.log(`💭 Trade Reflection: ${reflection.reflection}`);
+    if (rsi > 70 && trade.side === 'BUY') reasons.push('Bought at overbought RSI');
+    if (rsi < 30 && trade.side === 'SELL') reasons.push('Sold at oversold RSI');
+    if (volumeRatio < 1) reasons.push('Weak volume');
+    if (emaTrend === 'NEUTRAL') reasons.push('Unclear trend');
+
+    if (reasons.length === 0) reasons.push('Market moved against position');
+
+    return `❌ ${trade.symbol} ${trade.side} failed (${position.pnlPercent.toFixed(2)}% in ${durationMin.toFixed(0)}m). ${reasons.join(', ')}. RSI ${rsi.toFixed(1)}, MACD ${macd.toFixed(4)}. Avoid similar setups.`;
   }
-
-  private createReflectionText(trade: Trade, position: Position, marketData: MarketData, outcome: 'WIN' | 'LOSS'): string {
-    const { rsi, macd, emaTrend, volumeRatio } = marketData;
-    const duration = (Date.now() - trade.timestamp) / (1000 * 60); // minutes
-
-    if (outcome === 'WIN') {
-      return `✅ ${trade.symbol} ${trade.side} worked well (+${position.pnlPercent.toFixed(2)}% in ${duration.toFixed(0)}m). RSI ${rsi.toFixed(1)}, MACD ${macd.toFixed(4)}, ${emaTrend} trend, volume ${volumeRatio.toFixed(1)}x. Pattern worth remembering.`;
-    } else {
-      let reason = '';
-      if (rsi > 70 && trade.side === 'BUY') reason = 'Bought at overbought levels';
-      else if (rsi < 30 && trade.side === 'SELL') reason = 'Sold at oversold levels';
-      else if (volumeRatio < 1) reason = 'Low volume confirmation';
-      else if (emaTrend === 'NEUTRAL') reason = 'Unclear trend direction';
-      else reason = 'Market moved against position';
-
-      return `❌ ${trade.symbol} ${trade.side} failed (${position.pnlPercent.toFixed(2)}% in ${duration.toFixed(0)}m). ${reason}. RSI ${rsi.toFixed(1)}, MACD ${macd.toFixed(4)}. Avoid similar setups.`;
-    }
-  }
+}
 
   getMultiExitLevels(
   entryPrice: number,
@@ -569,71 +676,75 @@ existingPattern.outcome.avgDuration =
   positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
   leverage: number = 1
 ): { tp1: number; tp2: number; tp3: number; sl: number } {
-  const multiplier = side === 'LONG' ? 1 : -1;
-    
-    // Base levels
-    let tp1Pct = 0.01;   // 1%
-    let tp2Pct = 0.025;  // 2.5%
-    let tp3Pct = 0.05;   // 5%
-    let slPct = 0.015;   // 1.5%
-    
-    // Adjust based on market condition
-    if (marketCondition) {
-      switch (marketCondition.type) {
-        case 'HIGH_VOLATILITY':
-          // Wider targets and stops for volatile markets
-          tp1Pct = 0.015; // 1.5%
-          tp2Pct = 0.035; // 3.5%
-          tp3Pct = 0.07;  // 7%
-          slPct = 0.025;  // 2.5%
-          break;
-        case 'SIDEWAYS':
-          // Tighter targets for range-bound markets
-          tp1Pct = 0.008; // 0.8%
-          tp2Pct = 0.015; // 1.5%
-          tp3Pct = 0.025; // 2.5%
-          slPct = 0.01;   // 1%
-          break;
-        case 'TRENDING_UP':
-        case 'TRENDING_DOWN':
-          // Let winners run in trending markets
-          tp1Pct = 0.012; // 1.2%
-          tp2Pct = 0.03;  // 3%
-          tp3Pct = 0.08;  // 8%
-          slPct = 0.012;  // 1.2%
-          break;
-        case 'UNCERTAIN':
-          // Conservative targets in uncertain markets
-          tp1Pct = 0.008; // 0.8%
-          tp2Pct = 0.018; // 1.8%
-          tp3Pct = 0.035; // 3.5%
-          slPct = 0.012;  // 1.2%
-          break;
-      }
-      
-      // Adjust for volatility
-      const volatilityMultiplier = Math.max(0.7, Math.min(1.5, marketCondition.volatility * 25));
-      tp1Pct *= volatilityMultiplier;
-      tp2Pct *= volatilityMultiplier;
-      tp3Pct *= volatilityMultiplier;
-      slPct *= volatilityMultiplier;
-    }
-    
-     let { tp1, tp2, tp3, sl } = {
-    tp1: entryPrice * (1 + (tp1Pct * multiplier)),
-    tp2: entryPrice * (1 + (tp2Pct * multiplier)),
-    tp3: entryPrice * (1 + (tp3Pct * multiplier)),
-    sl: entryPrice * (1 - (slPct * multiplier))
-  };
+  // Base levels (default)
+  let tp1Pct = 0.01;
+  let tp2Pct = 0.025;
+  let tp3Pct = 0.05;
+  let slPct = 0.015;
 
-  // Kaldıraçlı işlemlerde stop-loss’u sıkılaştır
+  // Adjust based on market condition
+  if (marketCondition) {
+    switch (marketCondition.type) {
+      case 'HIGH_VOLATILITY':
+        tp1Pct = 0.015;
+        tp2Pct = 0.035;
+        tp3Pct = 0.07;
+        slPct = 0.025;
+        break;
+      case 'SIDEWAYS':
+        tp1Pct = 0.008;
+        tp2Pct = 0.015;
+        tp3Pct = 0.025;
+        slPct = 0.01;
+        break;
+      case 'TRENDING_UP':
+      case 'TRENDING_DOWN':
+        tp1Pct = 0.012;
+        tp2Pct = 0.03;
+        tp3Pct = 0.08;
+        slPct = 0.012;
+        break;
+      case 'UNCERTAIN':
+        tp1Pct = 0.008;
+        tp2Pct = 0.018;
+        tp3Pct = 0.035;
+        slPct = 0.012;
+        break;
+    }
+
+    // Adjust for volatility (capped)
+    const volatilityMultiplier = Math.max(0.7, Math.min(1.3, marketCondition.volatility * 25));
+    tp1Pct *= volatilityMultiplier;
+    tp2Pct *= volatilityMultiplier;
+    tp3Pct *= volatilityMultiplier;
+    slPct  *= volatilityMultiplier;
+  }
+
+  // Kaldıraçlı işlemlerde TP ve SL daraltma
   if (positionType !== 'SPOT') {
-  const slTightness = Math.max(0.5, 1 - 0.03 * leverage); // 10x → 0.7, 20x → 0.4
-  sl *= slTightness;
-}
+    const tpTightness = Math.max(0.5, 1 - 0.01 * leverage); // örn: 20x -> 0.8
+    const slTightness = Math.max(0.5, 1 - 0.03 * leverage); // örn: 20x -> 0.4
+
+    tp1Pct *= tpTightness;
+    tp2Pct *= tpTightness;
+    tp3Pct *= tpTightness;
+    slPct  *= slTightness;
+  }
+
+  // TP seviyeleri (LONG için yukarı, SHORT için aşağı)
+  const multiplier = side === 'LONG' ? 1 : -1;
+
+  const tp1 = entryPrice * (1 + tp1Pct * multiplier);
+  const tp2 = entryPrice * (1 + tp2Pct * multiplier);
+  const tp3 = entryPrice * (1 + tp3Pct * multiplier);
+
+  // SL yönü tam tersi olmalı
+  const sl = side === 'LONG'
+    ? entryPrice * (1 - slPct)
+    : entryPrice * (1 + slPct);
 
   return { tp1, tp2, tp3, sl };
-  }
+}
 
   getRiskMetrics(): RiskMetrics {
     return { ...this.riskMetrics };
