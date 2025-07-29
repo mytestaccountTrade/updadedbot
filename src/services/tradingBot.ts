@@ -17,6 +17,13 @@ class TradingBot {
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
   private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
+    private type ExitData = {
+    tp1Hit: boolean;
+    tp2Hit: boolean;
+    trailingSL: number;
+    peakPrice: number;
+    trailActivated: boolean;
+  };
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
@@ -1012,14 +1019,6 @@ private async calculateATR(symbol: string): Promise<number> {
     return 0;
   }
 }
-
-type ExitData = {
-  tp1Hit: boolean;
-  tp2Hit: boolean;
-  trailingSL: number;
-  peakPrice: number;
-  trailActivated: boolean;
-};
 
 private async checkMultiExitLevels(
   position: Position,
