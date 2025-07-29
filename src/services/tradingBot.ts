@@ -1019,14 +1019,20 @@ private async checkMultiExitLevels(
 ): Promise<{ shouldExit: boolean; reason: string }> {
   const isLong = position.side === 'LONG';
   const leverage = this.config.leverage ?? 1;
+const marketData = await binanceService.getMarketData(position.symbol);
 
-  const exitLevels = adaptiveStrategy.getMultiExitLevels(
-    position.entryPrice,
-    position.side,
-    undefined, // marketCondition eğer varsa buraya ekle
-    position.side, // positionType olarak LONG/SHORT veriyoruz
-    leverage
-  );
+let marketCondition;
+if (marketData) {
+  marketCondition = adaptiveStrategy.analyzeMarketCondition(marketData);
+}
+
+const exitLevels = adaptiveStrategy.getMultiExitLevels(
+  position.entryPrice,
+  position.side,
+  marketCondition,         // artık null değilse değerli olur
+  position.side,
+  leverage
+);
 
   if (!exitLevels) {
     console.warn(`No exit levels found for ${position.symbol}`);
