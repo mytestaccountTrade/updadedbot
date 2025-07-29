@@ -326,15 +326,12 @@ class TradingBot {
   try {
     const now = Date.now();
 
-    // Minimum 500ms between trades to prevent spam
     if (now - this.lastFastLearningTrade < 500) return;
 
     console.log(`⚡ WebSocket Fast Learning: ${marketData.symbol} - Price: $${marketData.price.toFixed(2)}, RSI: ${marketData.rsi.toFixed(1)}`);
 
-    // Skip if already in position
     if (this.activePositionIds.has(marketData.symbol)) return;
 
-    // Skip if at max positions
     const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
     if (this.portfolio.positions.length >= maxPositions) return;
 
@@ -343,9 +340,27 @@ class TradingBot {
     const learningInsights = await learningService.getMarketInsights();
     const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
 
-    const adaptiveDecision = this.config.adaptiveStrategyEnabled 
-      ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
-      : { shouldTrade: true, reason: 'Static strategy mode', confidence: 0.7, strategy: { entryThreshold: 0.6, riskMultiplier: this.config.enableAggressiveMode ? 1.5 : 1.0 } };
+    const leverage = this.config.leverage ?? 1;
+    const positionType = this.config.tradeMode === 'futures'
+      ? (enhancedSignal.action === 'BUY' ? 'LONG' : 'SHORT')
+      : 'SPOT';
+
+    const adaptiveDecision = this.config.adaptiveStrategyEnabled
+      ? adaptiveStrategy.shouldTrade(
+          marketData,
+          this.config.confidenceThreshold,
+          positionType,
+          leverage
+        )
+      : {
+          shouldTrade: true,
+          reason: 'Static strategy mode',
+          confidence: 0.7,
+          strategy: {
+            entryThreshold: 0.6,
+            riskMultiplier: this.config.enableAggressiveMode ? 1.5 : 1.0
+          }
+        };
 
     if (this.config.adaptiveStrategyEnabled && !adaptiveDecision.shouldTrade) {
       logService.warning('tradeBlocked', {
@@ -371,7 +386,7 @@ class TradingBot {
 
     const shouldTrade = finalSignal.action !== 'HOLD' && finalSignal.confidence > this.config.confidenceThreshold;
     const randomTrade = Math.random() < 0.1;
-     // 🛑 SPOT modunda SELL sinyallerini engelle
+
     if (
       this.config.tradeMode === 'spot' &&
       (finalSignal.action === 'SELL' || signal.action === 'SELL')
@@ -380,18 +395,17 @@ class TradingBot {
         symbol: marketData.symbol,
         reason: 'SELL action blocked in spot mode.'
       });
-      return; // İşlemi tamamen durdur
+      return;
     }
+
     if (shouldTrade || randomTrade) {
       let action = finalSignal.action;
 
-      // Rastgele işlemse, SPOT modunda sadece BUY'a izin ver
       if (randomTrade && !shouldTrade) {
-        if (this.config.tradeMode === 'spot') {
-          action = 'BUY';
-        } else {
-          action = Math.random() > 0.5 ? 'BUY' : 'SELL';
-        }
+        action = this.config.tradeMode === 'spot'
+          ? 'BUY'
+          : Math.random() > 0.5 ? 'BUY' : 'SELL';
+
         logService.learning('randomExplorationTrade', {
           action,
           symbol: marketData.symbol
@@ -409,13 +423,11 @@ class TradingBot {
       this.fastLearningTradeCount++;
       this.lastFastLearningTrade = now;
 
-      // ✅ Update portfolio metrics here
       this.updatePortfolioMetrics();
-     if(this.config.mode == "REAL") {
-      this.updateRealWalletBalance();
+      if (this.config.mode === "REAL") {
+        this.updateRealWalletBalance();
       }
 
-      // 🔄 Log updated status
       logService.info('portfolioStatus', {
         positions: this.portfolio.positions.length,
         totalValue: this.portfolio.totalValue.toFixed(2),
@@ -423,7 +435,6 @@ class TradingBot {
         availableBalance: this.portfolio.availableBalance.toFixed(2)
       });
 
-      // 🤖 Trigger learning every 3–5 trades
       const retrainInterval = 3 + Math.floor(Math.random() * 3);
       if (this.fastLearningTradeCount % retrainInterval === 0) {
         logService.learning('earlyRetraining', {
@@ -661,7 +672,7 @@ if (!matchedTrade) {
     });
 
     const batchSize = 3;
-    const pairs = tradingPairs; // slice artık gereksiz çünkü yukarıda limitli geliyor
+    const pairs = tradingPairs;
 
     for (let i = 0; i < pairs.length; i += batchSize) {
       const maxPositions = this.config.enableAggressiveMode ? 40 : this.config.maxPositions;
@@ -678,8 +689,18 @@ if (!matchedTrade) {
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
 
+        const leverage = this.config.leverage ?? 1;
+        const positionType = this.config.tradeMode === 'futures'
+          ? (enhancedSignal.action === 'BUY' ? 'LONG' : 'SHORT')
+          : 'SPOT';
+
         const adaptiveDecision = this.config.adaptiveStrategyEnabled
-          ? adaptiveStrategy.shouldTrade(marketData, this.config.confidenceThreshold)
+          ? adaptiveStrategy.shouldTrade(
+              marketData,
+              this.config.confidenceThreshold,
+              positionType,
+              leverage
+            )
           : {
               shouldTrade: true,
               reason: 'Static strategy mode',
@@ -714,9 +735,9 @@ if (!matchedTrade) {
     }
 
     this.updatePortfolioMetrics();
-     if(this.config.mode == "REAL") {
+    if (this.config.mode === "REAL") {
       this.updateRealWalletBalance();
-      }
+    }
   } catch (error) {
     logService.error(
       'tradingLoopError',
