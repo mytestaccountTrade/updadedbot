@@ -309,6 +309,13 @@ public setTradeMode(mode: 'spot' | 'futures', leverage: number = 1): void {
     : (this.tradeMode === 'futures'
         ? 'https://fapi.binance.com'
         : 'https://api.binance.com');
+  this.testnetUrl = this.isTestnet 
+    ? (this.tradeMode === 'futures'
+        ? 'https://testnet.binancefuture.com'
+        : 'https://testnet.binance.vision')
+    : (this.tradeMode === 'futures'
+        ? 'https://fapi.binance.com'
+        : 'https://api.binance.com');
   this.initializeSymbols();
   this.leverage = mode === 'futures' ? leverage : 1;
 }
