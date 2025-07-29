@@ -371,7 +371,7 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
     }
 
     const marketCondition = this.analyzeMarketCondition(marketData);
-    const strategy = this.selectOptimalStrategy(marketCondition);
+    const strategy = this.selectOptimalStrategy(marketCondition,leverage);
     const confidence = this.calculateSignalConfidence(marketData, marketCondition, confidenceThreshold);
      // Kaldıraçlı (futures) işlemlerde minimum güven eşiğini yükselt
   if (positionType !== 'SPOT' && confidence < 0.6) {
