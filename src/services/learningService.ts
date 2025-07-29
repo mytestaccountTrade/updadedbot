@@ -198,12 +198,14 @@ class LearningService {
     console.log(`📈 Position closed and recorded: ${position.symbol} P&L: ${position.pnl.toFixed(2)} (${openRecord.outcome})`);
     
     // Trigger retraining every 20 trades
-    if (this.tradeHistory.length - this.lastRetrainCount >= 20) {
-      await this.retrainModelInternal();
-      this.lastRetrainCount = this.tradeHistory.length;
-    } else if (this.tradeHistory.length % 10 === 0) {
-      await this.updateLearningInsights();
-    }
+     if (this.tradeHistory.filter(t => t.exitPrice).length - this.lastRetrainCount >= 50) {
+    await this.retrainModelInternal();
+    this.lastRetrainCount = this.tradeHistory.filter(t => t.exitPrice).length;
+  }
+  // Insight güncelleme eşiği her 20 → her 25 trade’de bir
+  else if (this.tradeHistory.filter(t => t.exitPrice).length % 25 === 0) {
+    await this.updateLearningInsights();
+  }
   }
 
   async getMarketInsights(): Promise<LearningInsights> {
@@ -512,7 +514,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       t.action === 'BUY'
     );
     
-    if (oversoldBullish.length >= 3) {
+    if (oversoldBullish.length >= 5) {
       const successRate = oversoldBullish.filter(t => t.outcome === 'PROFIT').length / oversoldBullish.length;
       const avgProfit = oversoldBullish.reduce((sum, t) => sum + (t.profitPercent || 0), 0) / oversoldBullish.length;
       
@@ -523,7 +525,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
           sentimentScore: { min: 0.5 }
         },
         action: 'BUY',
-        confidenceModifier: successRate > 0.7 ? 0.3 : -0.2,
+        confidenceModifier: successRate > 0.8 ? 0.5 : successRate > 0.6 ? 0.3 : -0.2,
         successRate,
         avgProfit,
         tradeCount: oversoldBullish.length,
@@ -538,7 +540,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       t.action === 'SELL'
     );
     
-    if (overboughtBearish.length >= 3) {
+    if (overboughtBearish.length >= 5) {
       const successRate = overboughtBearish.filter(t => t.outcome === 'PROFIT').length / overboughtBearish.length;
       const avgProfit = overboughtBearish.reduce((sum, t) => sum + (t.profitPercent || 0), 0) / overboughtBearish.length;
       
@@ -549,7 +551,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
           sentimentScore: { max: -0.3 }
         },
         action: 'SELL',
-        confidenceModifier: successRate > 0.7 ? 0.3 : -0.2,
+        confidenceModifier: successRate > 0.8 ? 0.5 : successRate > 0.6 ? 0.3 : -0.2,
         successRate,
         avgProfit,
         tradeCount: overboughtBearish.length,
@@ -564,7 +566,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       t.action === 'BUY'
     );
     
-    if (emaBullishVolume.length >= 3) {
+    if (emaBullishVolume.length >= 5) {
       const successRate = emaBullishVolume.filter(t => t.outcome === 'PROFIT').length / emaBullishVolume.length;
       const avgProfit = emaBullishVolume.reduce((sum, t) => sum + (t.profitPercent || 0), 0) / emaBullishVolume.length;
       
@@ -575,7 +577,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
           volumeRatio: { min: 1.5 }
         },
         action: 'BUY',
-        confidenceModifier: successRate > 0.6 ? 0.2 : -0.1,
+        confidenceModifier: successRate > 0.7 ? 0.4 : successRate > 0.5 ? 0.2 : -0.1,
         successRate,
         avgProfit,
         tradeCount: emaBullishVolume.length,
@@ -590,10 +592,10 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       t.action === 'BUY'
     );
     
-    if (avoidOverboughtBullish.length >= 3) {
+    if (avoidOverboughtBullish.length >= 5) {
       const successRate = avoidOverboughtBullish.filter(t => t.outcome === 'PROFIT').length / avoidOverboughtBullish.length;
       
-      if (successRate < 0.4) { // If this pattern fails often
+      if (successRate < 0.5) { // If this pattern fails often
         patterns.push({
           id: 'avoid_overbought_bullish',
           conditions: {
@@ -601,7 +603,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
             sentimentScore: { min: 0.6 }
           },
           action: 'HOLD',
-          confidenceModifier: -0.3,
+          confidenceModifier: -0.4,
           successRate,
           avgProfit: avoidOverboughtBullish.reduce((sum, t) => sum + (t.profitPercent || 0), 0) / avoidOverboughtBullish.length,
           tradeCount: avoidOverboughtBullish.length,
@@ -610,7 +612,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       }
     }
     
-    return patterns.filter(p => p.tradeCount >= 3); // Only return patterns with sufficient data
+    return patterns.filter(p => p.tradeCount >= 5); // Only return patterns with sufficient data
   }
 
   private async updateLearningInsights() {
