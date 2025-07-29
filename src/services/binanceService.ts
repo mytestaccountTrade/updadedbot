@@ -71,6 +71,7 @@ class BinanceService {
     : (this.tradeMode === 'futures'
         ? 'https://fapi.binance.com'
         : 'https://api.binance.com');
+    this.initializeSymbols();
 }
 
   private async initializeSymbols() {
