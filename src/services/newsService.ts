@@ -145,7 +145,9 @@ class NewsService {
       // Try to use local Llama 3 for trading signal generation
       try {
         if (await this.isLlama3Available()) {
-        const prompt = `Market Analysis for ${symbol}:
+        const coinName = symbol.replace('USDT', '');
+
+const prompt = `Market Analysis for ${symbol} (${coinName}):
 RSI: ${marketData.rsi?.toFixed(2)}
 EMA Trend: ${marketData.emaTrend}
 MACD: ${marketData.macd?.toFixed(4)}
@@ -153,10 +155,9 @@ Volume Ratio: ${marketData.volumeRatio?.toFixed(2)}
 Market Condition: ${marketCondition.type}
 News Sentiment: ${sentimentScore.toFixed(2)}
 
-Should we BUY, SELL or HOLD? Consider market regime and risk.
+Should we BUY, SELL or HOLD ${coinName}? Consider market regime and risk.
 
 Respond with: ACTION CONFIDENCE REASONING`;
-
           const response = await this.queryLlama3Throttled(prompt);
 
           if (response) {
