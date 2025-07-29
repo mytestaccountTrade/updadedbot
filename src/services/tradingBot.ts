@@ -16,7 +16,7 @@ class TradingBot {
   private fastLearningTradeCount: number = 0;
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
-  private multiExitPositions: Map<string, { tp1Hit: boolean; tp2Hit: boolean; trailingSL: number }> = new Map();
+  private multiExitPositions: Map<string, ExitData> = new Map();
     private type ExitData = {
     tp1Hit: boolean;
     tp2Hit: boolean;
