@@ -1,4 +1,4 @@
-import { BotConfig, Portfolio, Position, Trade, MarketData } from '../types/trading';
+import { BotConfig, Portfolio, Position, Trade, MarketData,ExitData } from '../types/trading';
 import { binanceService } from './binanceService';
 import { newsService } from './newsService';
 import { learningService } from './learningService';
@@ -17,13 +17,6 @@ class TradingBot {
   private lastFastLearningTrade: number = 0;
   private fastLearningRetrainCounter: number = 0;
   private multiExitPositions: Map<string, ExitData> = new Map();
-    private type ExitData = {
-    tp1Hit: boolean;
-    tp2Hit: boolean;
-    trailingSL: number;
-    peakPrice: number;
-    trailActivated: boolean;
-  };
   constructor() {
     // Load saved config or use defaults
     this.config = this.loadConfig();
