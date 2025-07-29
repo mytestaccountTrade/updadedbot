@@ -169,3 +169,11 @@ export interface SimulationReplay {
   totalPnL: number;
   totalTrades: number;
 }
+export interface ExitData {
+  tp1Hit: boolean;
+  tp2Hit: boolean;
+  trailingSL: number;
+  peakPrice: number;
+  trailActivated: boolean;
+}
+
