@@ -489,8 +489,13 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
     if (existingPattern) {
       // Update existing pattern
       existingPattern.outcome.tradeCount++;
-      existingPattern.outcome.avgProfit = (existingPattern.outcome.avgProfit + position.pnlPercent) / 2;
-      existingPattern.outcome.avgDuration = (existingPattern.outcome.avgDuration + duration) / 2;
+      existingPattern.outcome.avgProfit =
+  ((existingPattern.outcome.avgProfit * (existingPattern.outcome.tradeCount - 1)) + position.pnlPercent)
+  / existingPattern.outcome.tradeCount;
+
+existingPattern.outcome.avgDuration =
+  ((existingPattern.outcome.avgDuration * (existingPattern.outcome.tradeCount - 1)) + duration)
+  / existingPattern.outcome.tradeCount;
       existingPattern.lastUsed = Date.now();
       existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
     } else {
@@ -623,8 +628,9 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
 
   // Kaldıraçlı işlemlerde stop-loss’u sıkılaştır
   if (positionType !== 'SPOT') {
-    sl *= 0.95;
-  }
+  const slTightness = Math.max(0.5, 1 - 0.03 * leverage); // 10x → 0.7, 20x → 0.4
+  sl *= slTightness;
+}
 
   return { tp1, tp2, tp3, sl };
   }
