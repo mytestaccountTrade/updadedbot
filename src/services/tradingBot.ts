@@ -1013,14 +1013,20 @@ private async calculateATR(symbol: string): Promise<number> {
   }
 }
 
+type ExitData = {
+  tp1Hit: boolean;
+  tp2Hit: boolean;
+  trailingSL: number;
+  peakPrice: number;
+  trailActivated: boolean;
+};
+
 private async checkMultiExitLevels(
   position: Position,
   currentPrice: number
 ): Promise<{ shouldExit: boolean; reason: string }> {
   const isLong = position.side === 'LONG';
   const leverage = this.config.leverage ?? 1;
-
-  let exitData = this.multiExitPositions.get(position.id);
 
   const exitLevels = adaptiveStrategy.getMultiExitLevels(
     position.entryPrice,
@@ -1029,6 +1035,13 @@ private async checkMultiExitLevels(
     position.side, // positionType olarak LONG/SHORT veriyoruz
     leverage
   );
+
+  if (!exitLevels) {
+    console.warn(`No exit levels found for ${position.symbol}`);
+    return { shouldExit: false, reason: 'NO_EXIT_LEVELS' };
+  }
+
+  let exitData = this.multiExitPositions.get(position.id) as ExitData | undefined;
 
   if (!exitData) {
     exitData = {
@@ -1057,9 +1070,7 @@ private async checkMultiExitLevels(
       exitData.tp1Hit = true;
       exitData.trailingSL = position.entryPrice;
       console.log(
-        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(
-          2
-        )} - trailing SL moved to breakeven`
+        ` TP1 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to breakeven`
       );
       return { shouldExit: true, reason: 'TP1_REACHED' };
     }
@@ -1071,9 +1082,7 @@ private async checkMultiExitLevels(
       exitData.tp2Hit = true;
       exitData.trailingSL = exitLevels.tp1;
       console.log(
-        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(
-          2
-        )} - trailing SL moved to TP1`
+        ` TP2 hit for ${position.symbol} at ${currentPrice.toFixed(2)} - trailing SL moved to TP1`
       );
       return { shouldExit: true, reason: 'TP2_REACHED' };
     }
