@@ -86,13 +86,13 @@ class TradingBot {
           enableAggressiveMode: savedConfig.enableAggressiveMode !== undefined ? savedConfig.enableAggressiveMode : false
         };
         // ✅ Tam burada credentials set et
-      if (config.apiKey && config.apiSecret !== undefined) {
-      binanceService.setCredentials(
-        config.apiKey,
-        config.apiSecret,
-        config.mode === 'SIMULATION'
-      );
-    }
+      if (config.apiKey?.length > 0 && config.apiSecret?.length > 0) {
+  binanceService.setCredentials(
+    config.apiKey,
+    config.apiSecret,
+    config.mode === 'SIMULATION'
+  );
+}
 
       // ✅ Trade mode da set edilsin
       binanceService.setTradeMode(config.tradeMode, config.leverage);
@@ -171,9 +171,7 @@ class TradingBot {
     
     // Save configuration immediately
     this.saveConfig();
-    if (config.tradeMode) {
-      binanceService.setTradeMode(config.tradeMode,config.leverage);
-    }
+  
     // Update simulation balance if changed
     if (config.simulationBalance && this.config.mode === 'SIMULATION') {
       const currentValue = this.portfolio.totalValue;
@@ -187,14 +185,16 @@ class TradingBot {
     }
     
     // Update Binance service credentials if provided
-    if (config.apiKey && config.apiSecret !== undefined) {
-      binanceService.setCredentials(
-        config.apiKey,
-        config.apiSecret,
-        config.mode === 'SIMULATION'
-      );
+   if (config.apiKey?.length > 0 && config.apiSecret?.length > 0) {
+  binanceService.setCredentials(
+    config.apiKey,
+    config.apiSecret,
+    config.mode === 'SIMULATION'
+  );
+}
+      if (config.tradeMode) {
+      binanceService.setTradeMode(config.tradeMode,config.leverage);
     }
-    
     // Update Llama 3 configuration if provided
     if (config.llama3Url || config.llama3Model) {
       newsService.setLlama3Config(
