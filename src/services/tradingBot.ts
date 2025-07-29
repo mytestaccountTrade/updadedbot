@@ -1154,7 +1154,7 @@ private async checkMultiExitLevels(
 
   // Risk hesaplamaları
   const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
-  const baseRiskMultiplier = this.config.fastLearningMode ? 0.5 : 1;
+  const baseRiskMultiplier = 1; // veya bu satırı çıkar finalRiskMultiplier’dan this.config.fastLearningMode ? 0.5 : 1;
   const strategyRiskMultiplier = strategy?.riskMultiplier || 1;
   const adaptiveRiskMultiplier = adaptiveRisk.currentRiskLevel;
   const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
