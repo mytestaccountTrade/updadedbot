@@ -56,7 +56,6 @@ class BinanceService {
   this.baseUrl = 'https://api.binance.com';
   this.testnetUrl = 'https://testnet.binance.vision'; // ✅
   this.isTestnet = false;
-  this.initializeSymbols();
 }
 
   setCredentials(apiKey: string, apiSecret: string, useTestnet: boolean = true) {
