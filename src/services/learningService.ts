@@ -252,14 +252,23 @@ class LearningService {
       }
       
       // Use LLaMA 3 to enhance the signal based on learning
-      const prompt = `Based on trading history analysis:
-Successful patterns: ${insights.successfulPatterns.join(', ')}
-Failed patterns: ${insights.failedPatterns.join(', ')}
-Current market: RSI ${marketData.rsi}, EMA Trend ${marketData.emaTrend}, Sentiment ${signal.sentimentScore}
-Original signal: ${signal.action} with ${signal.confidence} confidence
+      const prompt = `Trading signal enhancement:
 
-Should we modify this signal? Respond with: ACTION CONFIDENCE REASONING
-Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why.`;
+Historical analysis:
+- Successful patterns: ${insights.successfulPatterns.join(', ')}
+- Failed patterns: ${insights.failedPatterns.join(', ')}
+
+Current Market Snapshot:
+- RSI: ${marketData.rsi}
+- EMA Trend: ${marketData.emaTrend}
+- Sentiment Score: ${signal.sentimentScore}
+- Volume Ratio: ${marketData.volumeRatio}
+- Current Signal: ${signal.action.toUpperCase()} (Confidence: ${signal.confidence})
+
+Instructions:
+Should we modify this signal? Respond in format:
+ACTION CONFIDENCE REASONING
+(Where ACTION = BUY / SELL / HOLD, CONFIDENCE ∈ [0.0 - 1.0])`;
 
       const response = await this.queryLlama3(prompt);
       this.lastLlama3Request = Date.now();
@@ -272,57 +281,61 @@ Where ACTION is BUY/SELL/HOLD, CONFIDENCE is 0.0-1.0, and REASONING explains why
     }
   }
 
-  private applyFastLearningEnhancements(signal: any, marketData: MarketData, insights: LearningInsights): { modified: boolean; signal: any } {
-    let confidence = signal.confidence;
-    let reasoning = signal.reasoning;
-    let modified = false;
-    
-    // Find similar profitable trades
-    const similarTrades = this.tradeHistory.filter(trade => {
-      if (!trade.indicators || !trade.exitPrice) return false;
-      
-      const rsiSimilar = Math.abs((trade.indicators.rsi || 50) - marketData.rsi) < 15;
-      const macdSimilar = Math.abs((trade.indicators.macd || 0) - marketData.macd) < 0.01;
-      
-      return rsiSimilar && macdSimilar && trade.outcome === 'PROFIT';
-    });
-    
-    if (similarTrades.length >= 2) {
-      confidence += 0.2;
-      reasoning += ' (Similar profitable setups found)';
-      modified = true;
-    }
-    
-    // Volume ratio bonus
-    if (marketData.volumeRatio > 1.5) {
-      confidence += 0.15;
-      reasoning += ' (High volume support)';
-      modified = true;
-    }
-    
-    // Bollinger band edge bonus
-    if (marketData.bollinger) {
-      const price = marketData.price;
-      const { upper, lower } = marketData.bollinger;
-      
-      if (price < lower * 1.02 && signal.action === 'BUY') {
-        confidence += 0.2;
-        reasoning += ' (Near Bollinger lower band)';
-        modified = true;
-      } else if (price > upper * 0.98 && signal.action === 'SELL') {
-        confidence += 0.2;
-        reasoning += ' (Near Bollinger upper band)';
-        modified = true;
-      }
-    }
-    
-    confidence = Math.min(0.95, confidence);
-    
-    return {
-      modified,
-      signal: modified ? { ...signal, confidence, reasoning } : signal
-    };
+  private applyFastLearningEnhancements(
+  signal: any,
+  marketData: MarketData,
+  insights: LearningInsights
+): { modified: boolean; signal: any } {
+  let confidence = signal.confidence;
+  const reasons: string[] = [];
+  let modified = false;
+
+  const applyConfidenceBoost = (amount: number, reason: string) => {
+    confidence += amount;
+    reasons.push(reason);
+    modified = true;
+  };
+
+  // ✅ Similar profitable trades
+  const similarTrades = this.tradeHistory.filter(t => {
+    if (!t.indicators || !t.exitPrice || t.outcome !== 'PROFIT') return false;
+    const rsiMatch = Math.abs((t.indicators.rsi ?? 50) - marketData.rsi) < 15;
+    const macdMatch = Math.abs((t.indicators.macd ?? 0) - marketData.macd) < 0.01;
+    return rsiMatch && macdMatch;
+  });
+
+  if (similarTrades.length >= 2) {
+    applyConfidenceBoost(0.2, '(Similar profitable setups detected)');
   }
+
+  // ✅ Volume ratio bonus
+  if (marketData.volumeRatio > 1.5) {
+    applyConfidenceBoost(0.15, '(High volume detected)');
+  }
+
+  // ✅ Bollinger band edge bonus
+  if (marketData.bollinger && marketData.price) {
+    const { upper, lower } = marketData.bollinger;
+    const price = marketData.price;
+
+    if (price < lower * 1.02 && signal.action === 'BUY') {
+      applyConfidenceBoost(0.2, '(Near lower Bollinger band)');
+    } else if (price > upper * 0.98 && signal.action === 'SELL') {
+      applyConfidenceBoost(0.2, '(Near upper Bollinger band)');
+    }
+  }
+
+  confidence = Math.min(0.95, confidence);
+
+  return {
+    modified,
+    signal: modified ? {
+      ...signal,
+      confidence,
+      reasoning: (signal.reasoning + ' ' + reasons.join(' ')).trim()
+    } : signal
+  };
+}
 
   private checkLearnedPatterns(signal: any, marketData: MarketData, insights: LearningInsights): { modified: boolean; signal: any; reason: string } {
     if (!insights.learnedPatterns || insights.learnedPatterns.length === 0) {
@@ -420,7 +433,8 @@ Current P&L: ${position.pnlPercent.toFixed(2)}%
 Position age: ${Math.floor((Date.now() - position.timestamp) / 60000)} minutes
 Market RSI: ${marketData.rsi}, EMA Trend: ${marketData.emaTrend}
 Similar trades success rate: ${(holdingSuccessRate * 100).toFixed(1)}%
-
+Trailing SL: ${position.trailingSL ?? 'N/A'}
+Peak price: ${position.peakPrice ?? 'N/A'}
 Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
 
       // Throttle Llama 3 requests
@@ -753,7 +767,7 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
 
       return {
         shouldExit: decision === 'EXIT',
-        confidence,
+        confidence: isNaN(confidence) ? 0.5 : confidence,
         reason
       };
     } catch (error) {
@@ -858,6 +872,12 @@ Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
       if (trade.sentimentScore > 0.5 && trade.action === 'BUY' && trade.outcome === 'PROFIT') {
         indicators.push('SENTIMENT_POSITIVE_BUY');
       }
+      if (tradeIndicators.macd > 0 && trade.outcome === 'PROFIT') {
+  indicators.push('MACD_POSITIVE_PROFIT');
+}
+if (tradeIndicators.volumeRatio > 1.5 && trade.outcome === 'PROFIT') {
+  indicators.push('VOLUME_SPIKE_PROFIT');
+}
     });
     
     return [...new Set(indicators)];
