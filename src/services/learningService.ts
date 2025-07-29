@@ -433,8 +433,7 @@ Current P&L: ${position.pnlPercent.toFixed(2)}%
 Position age: ${Math.floor((Date.now() - position.timestamp) / 60000)} minutes
 Market RSI: ${marketData.rsi}, EMA Trend: ${marketData.emaTrend}
 Similar trades success rate: ${(holdingSuccessRate * 100).toFixed(1)}%
-Trailing SL: ${position.trailingSL ?? 'N/A'}
-Peak price: ${position.peakPrice ?? 'N/A'}
+
 Should we exit this position? Respond with: EXIT/HOLD CONFIDENCE REASON`;
 
       // Throttle Llama 3 requests
