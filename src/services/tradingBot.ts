@@ -1274,7 +1274,9 @@ const quantity = positionNotional / marketData.price;
   this.multiExitPositions.set(position.id, {
     tp1Hit: false,
     tp2Hit: false,
-    trailingSL: exitLevels.sl
+    trailingSL: exitLevels.sl,
+    peakPrice: position.entryPrice,
+    trailActivated: false
   });
 
   if (this.config.enableAggressiveMode) {
