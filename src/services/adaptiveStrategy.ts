@@ -29,7 +29,7 @@ export interface TradePattern {
     bollingerPosition: string;
     timeOfDay: string;
     // NEW
-    marketTrend?: 'UP' | 'DOWN' | 'SIDEWAYS';
+    marketTrend?: 'UP' | 'DOWN' | 'SIDEWAYS' | 'UNKNOWN';
   };
   outcome: {
     winRate: number;
