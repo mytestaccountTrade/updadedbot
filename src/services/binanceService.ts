@@ -63,15 +63,6 @@ class BinanceService {
   this.apiKey = apiKey;
   this.apiSecret = apiSecret;
   this.isTestnet = useTestnet;
-
-  this.baseUrl = useTestnet 
-    ? (this.tradeMode === 'futures'
-        ? 'https://testnet.binancefuture.com'
-        : 'https://testnet.binance.vision')
-    : (this.tradeMode === 'futures'
-        ? 'https://fapi.binance.com'
-        : 'https://api.binance.com');
-    this.initializeSymbols();
 }
 
   private async initializeSymbols() {
@@ -312,9 +303,13 @@ class BinanceService {
 }
 public setTradeMode(mode: 'spot' | 'futures', leverage: number = 1): void {
   this.tradeMode = mode;
-  this.baseUrl = mode === 'futures'
-    ? 'https://fapi.binance.com'
-    : 'https://api.binance.com';
+  this.baseUrl = this.isTestnet 
+    ? (this.tradeMode === 'futures'
+        ? 'https://testnet.binancefuture.com'
+        : 'https://testnet.binance.vision')
+    : (this.tradeMode === 'futures'
+        ? 'https://fapi.binance.com'
+        : 'https://api.binance.com');
 
   this.leverage = mode === 'futures' ? leverage : 1;
 }
