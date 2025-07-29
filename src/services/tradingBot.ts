@@ -996,12 +996,20 @@ private async checkMultiExitLevels(
   position: Position,
   currentPrice: number
 ): Promise<{ shouldExit: boolean; reason: string }> {
-  let exitData: any = this.multiExitPositions.get(position.id);
+  const isLong = position.side === 'LONG';
+  const leverage = this.config.leverage ?? 1;
+
+  let exitData = this.multiExitPositions.get(position.id);
+
+  const exitLevels = adaptiveStrategy.getMultiExitLevels(
+    position.entryPrice,
+    position.side,
+    undefined, // marketCondition eğer varsa buraya ekle
+    position.side, // positionType olarak LONG/SHORT veriyoruz
+    leverage
+  );
+
   if (!exitData) {
-    const exitLevels = adaptiveStrategy.getMultiExitLevels(
-      position.entryPrice,
-      position.side
-    );
     exitData = {
       tp1Hit: false,
       tp2Hit: false,
@@ -1012,12 +1020,6 @@ private async checkMultiExitLevels(
     this.multiExitPositions.set(position.id, exitData);
     return { shouldExit: false, reason: '' };
   }
-
-  const exitLevels = adaptiveStrategy.getMultiExitLevels(
-    position.entryPrice,
-    position.side
-  );
-  const isLong = position.side === 'LONG';
 
   if (
     (isLong && currentPrice <= exitData.trailingSL) ||
@@ -1071,25 +1073,18 @@ private async checkMultiExitLevels(
     if (startTrail) {
       exitData.trailActivated = true;
 
-      if (isLong) {
-        exitData.peakPrice = Math.max(exitData.peakPrice, currentPrice);
-      } else {
-        exitData.peakPrice = Math.min(exitData.peakPrice, currentPrice);
-      }
+      exitData.peakPrice = isLong
+        ? Math.max(exitData.peakPrice, currentPrice)
+        : Math.min(exitData.peakPrice, currentPrice);
 
-      let trailDistance: number = 0;
-      let atrValue = 0;
-      const cached = this.atrCache[position.symbol];
-      if (cached) atrValue = cached.value;
-       atrValue = await this.calculateATR(position.symbol); // 🔥 bu şekilde
+      let atrValue = this.atrCache[position.symbol]?.value || 0;
+      atrValue = await this.calculateATR(position.symbol);
 
-      const fallbackDist =
-        (this.config.trailingStopPercent || 0.015) * currentPrice;
-      trailDistance = Math.max(atrValue, fallbackDist);
+      const fallbackDist = (this.config.trailingStopPercent || 0.015) * currentPrice;
+      const trailDistance = Math.max(atrValue, fallbackDist);
+
       console.log(
-        `Using ATR (${atrValue.toFixed(
-          4
-        )}) as trailing stop distance for ${position.symbol}`
+        `Using ATR (${atrValue.toFixed(4)}) as trailing stop distance for ${position.symbol}`
       );
 
       const proposedSL = isLong
