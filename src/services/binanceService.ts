@@ -310,7 +310,7 @@ public setTradeMode(mode: 'spot' | 'futures', leverage: number = 1): void {
     : (this.tradeMode === 'futures'
         ? 'https://fapi.binance.com'
         : 'https://api.binance.com');
-
+  this.initializeSymbols();
   this.leverage = mode === 'futures' ? leverage : 1;
 }
 private getEndpoint(pathMap: { spot: string; futures: string }): string {
