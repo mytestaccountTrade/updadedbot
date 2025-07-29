@@ -110,50 +110,72 @@ class AdaptiveStrategyService {
   }
 
   analyzeMarketCondition(marketData: MarketData): MarketCondition {
-    const { rsi, macd, volumeRatio, emaTrend, bollinger, price } = marketData;
-    
-    // Calculate volatility from Bollinger Bands
-    const volatility = bollinger ? (bollinger.upper - bollinger.lower) / bollinger.middle : 0.02;
-    
-    // Determine time of day
-    const hour = new Date().getUTCHours();
-    let timeOfDay: MarketCondition['timeOfDay'];
-    if (hour >= 0 && hour < 6) timeOfDay = 'ASIAN';
-    else if (hour >= 6 && hour < 14) timeOfDay = 'EUROPEAN';
-    else if (hour >= 14 && hour < 22) timeOfDay = 'AMERICAN';
-    else timeOfDay = 'OVERNIGHT';
+  const { rsi, macd, volumeRatio, emaTrend, bollinger, price } = marketData;
 
-    // Analyze market condition
-    let type: MarketCondition['type'];
-    let confidence = 0.5;
+  // Volatilite hesapla
+  const volatility = bollinger
+    ? (bollinger.upper - bollinger.lower) / bollinger.middle
+    : 0.02;
 
-    // High volatility check
-    if (volatility > 0.05) {
-      type = 'HIGH_VOLATILITY';
-      confidence = 0.8;
-    }
-    // Trending conditions
-    else if (emaTrend === 'BULLISH' && rsi > 50 && macd > 0 && volumeRatio > 1.2) {
-      type = 'TRENDING_UP';
-      confidence = 0.8;
-    }
-    else if (emaTrend === 'BEARISH' && rsi < 50 && macd < 0 && volumeRatio > 1.2) {
-      type = 'TRENDING_DOWN';
-      confidence = 0.8;
-    }
-    // Sideways market
-    else if (Math.abs(macd) < 0.001 && rsi > 40 && rsi < 60 && volatility < 0.02) {
-      type = 'SIDEWAYS';
-      confidence = 0.7;
-    }
-    // Uncertain conditions
-    else {
-      type = 'UNCERTAIN';
-      confidence = 0.3;
-    }
+  // Zaman dilimi belirle
+  const hour = new Date().getUTCHours();
+  const timeOfDay =
+    hour < 6 ? 'ASIAN'
+    : hour < 14 ? 'EUROPEAN'
+    : hour < 22 ? 'AMERICAN'
+    : 'OVERNIGHT';
 
-    return { type, confidence, volatility, volume: volumeRatio, timeOfDay };
+  // Puan bazlı analiz
+  let scoreTrendingUp = 0;
+  let scoreTrendingDown = 0;
+  let scoreSideways = 0;
+  let confidence = 0.5;
+
+  if (emaTrend === 'BULLISH') scoreTrendingUp += 1;
+  if (emaTrend === 'BEARISH') scoreTrendingDown += 1;
+
+  if (rsi > 60) scoreTrendingUp += 1;
+  else if (rsi < 40) scoreTrendingDown += 1;
+  else scoreSideways += 1;
+
+  if (macd > 0.001) scoreTrendingUp += 1;
+  else if (macd < -0.001) scoreTrendingDown += 1;
+  else scoreSideways += 1;
+
+  if (volumeRatio > 1.2) {
+    scoreTrendingUp += 0.5;
+    scoreTrendingDown += 0.5;
   }
+
+  if (volatility < 0.02) scoreSideways += 1;
+  else if (volatility > 0.05) confidence += 0.2; // volatil piyasada güven yüksekse daha cesur olabiliriz
+
+  // En yüksek skor kazansın
+  let type: MarketCondition['type'] = 'UNCERTAIN';
+  const maxScore = Math.max(scoreTrendingUp, scoreTrendingDown, scoreSideways);
+
+  if (maxScore >= 2.5) {
+    if (scoreTrendingUp === maxScore) type = 'TRENDING_UP';
+    else if (scoreTrendingDown === maxScore) type = 'TRENDING_DOWN';
+    else if (scoreSideways === maxScore) type = 'SIDEWAYS';
+    confidence = 0.7 + (maxScore / 5) * 0.2; // max 0.9 confidence
+  } else if (volatility > 0.05) {
+    type = 'HIGH_VOLATILITY';
+    confidence = 0.8;
+  } else {
+    type = 'UNCERTAIN';
+    confidence = 0.3;
+  }
+
+  return {
+    type,
+    confidence: Math.min(confidence, 0.95),
+    volatility,
+    volume: volumeRatio,
+    timeOfDay
+  };
+}
+
 
   selectOptimalStrategy(
   marketCondition: MarketCondition,
@@ -203,74 +225,76 @@ class AdaptiveStrategyService {
     adjustedStrategy.riskMultiplier *= this.riskMetrics.currentRiskLevel;
      // Kaldıraç arttıkça risk çarpanını azalt
   if (leverage > 1) {
-    const reduction = Math.min(leverage * 0.1, 0.5); // örn. 10x kaldıraç = -1.0, ancak 0.5 sınırı var
-    adjustedStrategy.riskMultiplier = Math.max(0.1, adjustedStrategy.riskMultiplier - reduction);
+    const leverageReduction = leverage > 1
+  ? Math.max(0.5, 1 / Math.log2(leverage + 1))
+  : 1.0;
+
+adjustedStrategy.riskMultiplier *= leverageReduction;
   }
     return adjustedStrategy;
   }
 
-  calculateSignalConfidence(marketData: MarketData, marketCondition: MarketCondition, confidenceThreshold: number = 0.8): number {
-    const { rsi, macd, volumeRatio, emaTrend } = marketData;
-    let confidence = 0.5;
-    let indicatorCount = 0;
-    let agreementScore = 0;
+  calculateSignalConfidence(
+  marketData: MarketData,
+  marketCondition: MarketCondition,
+  confidenceThreshold: number = 0.8
+): number {
+  let score = 0;
+  let weight = 0;
 
-    // RSI analysis
-    if (rsi < 30) {
-      agreementScore += 1; // Oversold - bullish
-      indicatorCount++;
-    } else if (rsi > 70) {
-      agreementScore -= 1; // Overbought - bearish
-      indicatorCount++;
-    }
-
-    // MACD analysis
-    if (macd > 0.001) {
-      agreementScore += 1; // Bullish
-      indicatorCount++;
-    } else if (macd < -0.001) {
-      agreementScore -= 1; // Bearish
-      indicatorCount++;
-    }
-
-    // EMA trend analysis
-    if (emaTrend === 'BULLISH') {
-      agreementScore += 1;
-      indicatorCount++;
-    } else if (emaTrend === 'BEARISH') {
-      agreementScore -= 1;
-      indicatorCount++;
-    }
-
-    // Volume confirmation
-    if (volumeRatio > 1.5) {
-      agreementScore += 0.5; // High volume confirms signal
-      indicatorCount++;
-    } else if (volumeRatio < 0.8) {
-      agreementScore -= 0.5; // Low volume weakens signal
-      indicatorCount++;
-    }
-
-    // Calculate final confidence
-    if (indicatorCount > 0) {
-      const agreement = Math.abs(agreementScore) / indicatorCount;
-      confidence = Math.min(0.95, 0.3 + (agreement * 0.6));
-      
-      // Reduce confidence if indicators conflict
-      if (Math.abs(agreementScore) < indicatorCount * 0.3) {
-        confidence *= 0.7; // Conflicting signals
-      }
-    }
-
-    // Market condition adjustment
-    confidence *= marketCondition.confidence;
-
-    // Pattern matching bonus
-    const patternBonus = this.getPatternMatchBonus(marketData);
-    confidence = Math.min(0.95, confidence + patternBonus);
-
-    return confidence;
+  // RSI Normalize: ideal aralık 60–70
+  if (marketData.rsi !== undefined) {
+    const rsiScore = Math.max(0, Math.min((marketData.rsi - 50) / 20, 1)); // 50–70 → 0–1
+    score += rsiScore * 1.2;
+    weight += 1.2;
   }
+
+  // MACD Normalize: tanh ile aşırı değerleri bastır
+  if (marketData.macd !== undefined) {
+    const macdScore = Math.tanh(marketData.macd * 10); // genelde 0.005–0.02 civarında
+    score += macdScore * 1.5;
+    weight += 1.5;
+  }
+
+  // EMA Trend
+  if (marketData.emaTrend === 'BULLISH') {
+    score += 1.0;
+    weight += 1.0;
+  } else if (marketData.emaTrend === 'BEARISH') {
+    score -= 1.0;
+    weight += 1.0;
+  }
+
+  // VolumeRatio normalize
+  if (marketData.volumeRatio !== undefined) {
+    const volScore = Math.min(marketData.volumeRatio / 2, 1); // 0–2 → 0–1
+    score += volScore * 0.8;
+    weight += 0.8;
+  }
+
+  // Bollinger pozisyon
+  const bollPos = this.getBollingerPosition(marketData);
+  if (bollPos === 'UPPER') {
+    score -= 0.5;
+    weight += 0.5;
+  } else if (bollPos === 'LOWER') {
+    score += 0.5;
+    weight += 0.5;
+  }
+
+  // Pattern bonus
+  const patternBonus = this.getPatternMatchBonus(marketData);
+  score += patternBonus;
+  weight += patternBonus > 0 ? 0.6 : 0;
+
+  // Normalize confidence
+  let confidence = weight > 0 ? Math.max(0, Math.min(score / weight, 1)) : 0.5;
+
+  // Market condition etkisi
+  confidence *= marketCondition.confidence;
+
+  return Number(confidence.toFixed(3));
+}
 
   private getPatternMatchBonus(marketData: MarketData): number {
     const hour = new Date().getUTCHours();
