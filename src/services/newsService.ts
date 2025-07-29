@@ -168,7 +168,7 @@ Respond with: ACTION CONFIDENCE REASONING`;
           if (actionMatch) {
             const action = actionMatch[1] as 'BUY' | 'SELL' | 'HOLD';
             const confidence = confidenceMatch ? Math.min(parseFloat(confidenceMatch[1]), 1.0) : 0.6;
-            const reasoning = result.replace(/(BUY|SELL|HOLD)/, '').replace(/\d+\.?\d*/, '').trim();
+            const reasoning = result.replace(`${actionMatch[1]} ${confidenceMatch?.[1]}`, '').trim();
             
             return { 
               action, 
