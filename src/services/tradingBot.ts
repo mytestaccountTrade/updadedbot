@@ -1160,15 +1160,13 @@ private async checkMultiExitLevels(
   const marketRiskMultiplier = this.getMarketRiskMultiplier(marketCondition);
 
   const finalRiskMultiplier = baseRiskMultiplier * strategyRiskMultiplier * adaptiveRiskMultiplier * marketRiskMultiplier;
-  let riskAmount = this.portfolio.availableBalance * this.config.maxRiskPerTrade * finalRiskMultiplier;
+  // Yeni hesaplama önerisi:
+const lev = this.config.tradeMode === 'futures' ? (this.config.leverage ?? 1) : 1;
 
-  if (this.config.tradeMode === 'futures') {
-    const lev = this.config.leverage ?? 1;
-    riskAmount *= lev;
-  }
-
-  const riskMultiplier = this.config.enableAggressiveMode ? 2.0 : 1.0;
-  const quantity = (riskAmount * riskMultiplier) / marketData.price;
+const rawRisk = this.portfolio.availableBalance * this.config.maxRiskPerTrade;
+const riskAmount = rawRisk * finalRiskMultiplier; // Risk profiline göre
+const positionNotional = riskAmount * lev; // Kaldıraçlı pozisyon büyüklüğü
+const quantity = positionNotional / marketData.price;
 
   // Komisyon oranları
   const COMMISSION_SPOT = 0.001;
