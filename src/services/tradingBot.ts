@@ -86,11 +86,13 @@ class TradingBot {
           enableAggressiveMode: savedConfig.enableAggressiveMode !== undefined ? savedConfig.enableAggressiveMode : false
         };
         // ✅ Tam burada credentials set et
+      if (config.apiKey && config.apiSecret !== undefined) {
       binanceService.setCredentials(
         config.apiKey,
         config.apiSecret,
         config.mode === 'SIMULATION'
       );
+    }
 
       // ✅ Trade mode da set edilsin
       binanceService.setTradeMode(config.tradeMode, config.leverage);
