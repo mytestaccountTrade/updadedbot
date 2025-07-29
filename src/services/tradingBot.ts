@@ -1486,12 +1486,12 @@ this.portfolio.availableBalance += returnAmount;
   if (marketData) {
     adaptiveStrategy.recordTradeOutcome(originalTrade, position, marketData);
   }
- this.updatePortfolioMetrics();
+
   // Pozisyonu sil
   this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
   this.activePositionIds.delete(position.symbol);
   this.multiExitPositions.delete(position.id);
-
+   this.updatePortfolioMetrics();
   console.log(`✅ Position closed (${reason}): ${position.symbol} PnL: ${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
   return true;
 }
