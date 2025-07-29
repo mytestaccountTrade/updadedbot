@@ -185,7 +185,8 @@ class TradingBot {
     }
     
     // Update Binance service credentials if provided
-   if (config.apiKey?.length > 0 && config.apiSecret?.length > 0) {
+  if (typeof config.apiKey === 'string' && config.apiKey.length > 0 &&
+    typeof config.apiSecret === 'string' && config.apiSecret.length > 0) {
   binanceService.setCredentials(
     config.apiKey,
     config.apiSecret,
