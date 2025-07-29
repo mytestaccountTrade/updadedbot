@@ -103,24 +103,33 @@ class MultiStrategyService {
   }
 
   private async evaluateNewsSentimentStrategy(
-    symbol: string, 
-    marketData: MarketData, 
-    news: NewsItem[], 
-    weight: number
-  ): Promise<StrategyResult> {
-    const relevantNews = news.filter(item => 
-      item.coins.includes(symbol.replace('USDT', '')) || 
-      item.title.toLowerCase().includes('crypto') ||
-      item.title.toLowerCase().includes('bitcoin') ||
-      item.title.toLowerCase().includes('ethereum')
-    );
+  symbol: string,
+  marketData: MarketData,
+  news: NewsItem[],
+  weight: number
+): Promise<StrategyResult> {
+  const relevantNews = news.filter(item =>
+    item.coins.includes(symbol.replace('USDT', '')) ||
+    item.title.toLowerCase().includes('crypto') ||
+    item.title.toLowerCase().includes('bitcoin') ||
+    item.title.toLowerCase().includes('ethereum')
+  );
 
-    let sentimentScore = 0;
-    let confidence = 0.5;
-    let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+  if (relevantNews.length > 0) {
+    try {
+      const result = await newsService.generateTradingSignal(symbol, marketData, relevantNews);
 
-    if (relevantNews.length > 0) {
-      sentimentScore = relevantNews.reduce((sum, item) => {
+      return {
+        strategyName: 'NEWS_SENTIMENT',
+        action: result.action,
+        confidence: Math.min(1, result.confidence * weight),
+        reasoning: `Llama3: ${result.reasoning}`,
+        weight
+      };
+    } catch (error) {
+      console.warn(`Llama3 failed, fallbacking to basic sentiment:`, error);
+      // Fallback: Basic sentiment score
+      const sentimentScore = relevantNews.reduce((sum, item) => {
         switch (item.sentiment) {
           case 'BULLISH': return sum + 1;
           case 'BEARISH': return sum - 1;
@@ -128,23 +137,36 @@ class MultiStrategyService {
         }
       }, 0) / relevantNews.length;
 
+      let action: 'BUY' | 'SELL' | 'HOLD' = 'HOLD';
+      let confidence = 0.5;
+
       if (sentimentScore > 0.3) {
         action = 'BUY';
-        confidence = Math.min(0.9, 0.5 + Math.abs(sentimentScore));
+        confidence = 0.5 + Math.abs(sentimentScore);
       } else if (sentimentScore < -0.3) {
         action = 'SELL';
-        confidence = Math.min(0.9, 0.5 + Math.abs(sentimentScore));
+        confidence = 0.5 + Math.abs(sentimentScore);
       }
-    }
 
-    return {
-      strategyName: 'NEWS_SENTIMENT',
-      action,
-      confidence: confidence * weight,
-      reasoning: `News sentiment: ${sentimentScore.toFixed(2)} (${relevantNews.length} articles)`,
-      weight
-    };
+      return {
+        strategyName: 'NEWS_SENTIMENT',
+        action,
+        confidence: Math.min(0.9, confidence * weight),
+        reasoning: `Fallback sentiment: ${sentimentScore.toFixed(2)} (${relevantNews.length} articles)`,
+        weight
+      };
+    }
   }
+
+  // No relevant news at all
+  return {
+    strategyName: 'NEWS_SENTIMENT',
+    action: 'HOLD',
+    confidence: 0,
+    reasoning: 'No relevant news available',
+    weight
+  };
+}
 
   private evaluateVolumeSpikeStrategy(marketData: MarketData, weight: number): StrategyResult {
     const { volumeRatio, bollinger, price } = marketData;
