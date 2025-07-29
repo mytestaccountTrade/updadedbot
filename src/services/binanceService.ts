@@ -63,11 +63,16 @@ class BinanceService {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.isTestnet = useTestnet;
+    this.baseUrl = useTestnet 
+    ? (this.tradeMode === 'futures' ? 'https://testnet.binancefuture.com' : 'https://testnet.binance.vision')
+    : (this.tradeMode === 'futures' ? 'https://fapi.binance.com' : 'https://api.binance.com');
   }
 
   private async initializeSymbols() {
   const isFutures = this.tradeMode === 'futures';
-  const endpoint = isFutures ? '/fapi/v1/exchangeInfo' : '/api/v3/exchangeInfo';
+  const endpoint = this.isTestnet
+  ? (isFutures ? '/fapi/v1/exchangeInfo' : '/api/v3/exchangeInfo')
+  : (isFutures ? '/fapi/v1/exchangeInfo' : '/api/v3/exchangeInfo');
 
   try {
     const exchangeInfo = await this.makeRequestWithRetry(endpoint);
