@@ -1299,6 +1299,7 @@ const quantity = positionNotional / marketData.price;
   this.portfolio.availableBalance -= requiredBalance;
 
   await learningService.recordTrade(trade, position, tradeContext);
+  this.updatePortfolioMetrics();
 
   console.log(`✅ ${this.config.mode} trade executed: ${action} ${quantity.toFixed(6)} ${symbol} at $${marketData.price.toFixed(2)}`);
   console.log(`   📊 Market: ${marketCondition.type}, Risk: ${(finalRiskMultiplier * 100).toFixed(0)}%, Confidence: ${signal?.confidence?.toFixed(2) || 'N/A'}`);
@@ -1485,7 +1486,7 @@ this.portfolio.availableBalance += returnAmount;
   if (marketData) {
     adaptiveStrategy.recordTradeOutcome(originalTrade, position, marketData);
   }
-
+ this.updatePortfolioMetrics();
   // Pozisyonu sil
   this.portfolio.positions = this.portfolio.positions.filter(p => p.id !== position.id);
   this.activePositionIds.delete(position.symbol);
