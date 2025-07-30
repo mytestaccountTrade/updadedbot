@@ -1443,39 +1443,38 @@ const quantity = positionNotional / marketData.price;
     const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
     originalTrade.duration = duration;
   } else {
-    // Simülasyon modunda fiyatı ve kârı hesapla
-   // Çıkış işlemi ücret oranları
-const COMMISSION_SPOT = 0.001;       // %0.1 komisyon
-const COMMISSION_FUTURES = 0.0004;   // %0.04 komisyon
-const FUNDING_ESTIMATE = 0.0001;     // İsteğe bağlı fonlama tahmini (%0.01)
+  // SIMULASYON modu
+    const COMMISSION_SPOT = 0.001;       // %0.1
+    const COMMISSION_FUTURES = 0.0004;   // %0.04
+    const FUNDING_ESTIMATE = 0.0001;     // %0.01
+    const lev = this.config.leverage ?? 1;
 
-// Brüt çıkış tutarı (pozisyon büyüklüğü * güncel fiyat)
-const grossExit = position.size * position.currentPrice;
+    const grossExit     = position.size * position.currentPrice;
+    const exitFee       = this.config.tradeMode === 'futures'
+      ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
+      : grossExit * COMMISSION_SPOT;
 
-// Ücreti mod bazında hesapla
-const exitFee = this.config.tradeMode === 'futures'
-  ? grossExit * (COMMISSION_FUTURES + FUNDING_ESTIMATE)
-  : grossExit * COMMISSION_SPOT;
-const entryNotional = position.size * position.entryPrice;
-const lev = this.config.leverage ?? 1;
-const marginDeposit = lev > 0 ? entryNotional / lev : entryNotional;
-const netExit = grossExit - exitFee;
-    let returnAmount;
-if (this.config.tradeMode === 'futures') {
-  returnAmount = marginDeposit + netExit - entryNotional;
-} else {
-  returnAmount = netExit;
-}
-    // Güncelleme
-    originalTrade.exitPrice = position.currentPrice;
-    originalTrade.profit = position.pnl;
-    originalTrade.closeTimestamp = closeTimestamp;
-    originalTrade.status = 'FILLED';
-    const duration = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
-originalTrade.duration = duration;
+    let returnAmount: number;
+    if (this.config.tradeMode === 'futures') {
+      const entryNotional = position.size * position.entryPrice;
+      const marginDeposit = entryNotional / lev;
 
-   // Bu tutarı bakiyeye ekleyin
-this.portfolio.availableBalance += returnAmount;
+      // Düzeltilmiş: marjin + net kâr (position.pnl) - çıkış ücreti
+      returnAmount = marginDeposit + position.pnl - exitFee;
+    } else {
+      // Spot: brüt çıkış eksi komisyon
+      returnAmount = grossExit - exitFee;
+    }
+
+    // originalTrade güncelle
+    originalTrade.exitPrice     = position.currentPrice;
+    originalTrade.profit        = position.pnl;
+    originalTrade.closeTimestamp= closeTimestamp;
+    originalTrade.status        = 'FILLED';
+    originalTrade.duration      = Math.floor((closeTimestamp - originalTrade.timestamp) / 1000);
+
+    // Bakiyeye ekle
+    this.portfolio.availableBalance += returnAmount;
   }
 
   // Learning servisine bildir
