@@ -53,6 +53,8 @@ export interface RiskMetrics {
 class AdaptiveStrategyService {
   private strategies: Map<string, TradingStrategy> = new Map();
   private learnedPatterns: TradePattern[] = [];
+  private winningPatterns: TradePattern[] = [];
+private losingPatterns : TradePattern[] = [];
   private useMongoDB: boolean = true;
   private riskMetrics: RiskMetrics = {
     recentWinRate: 0.5,
@@ -312,25 +314,29 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
 }
 
   private getPatternMatchBonus(marketData: MarketData): number {
-    const hour = new Date().getUTCHours();
-    let timeOfDay: string;
-    if (hour >= 0 && hour < 6) timeOfDay = 'ASIAN';
-    else if (hour >= 6 && hour < 14) timeOfDay = 'EUROPEAN';
-    else if (hour >= 14 && hour < 22) timeOfDay = 'AMERICAN';
-    else timeOfDay = 'OVERNIGHT';
+  const now = Date.now();
+  const hour = new Date().getUTCHours();
+  const timeOfDay = /* … */; 
+  const bollingerPosition = this.getBollingerPosition(marketData);
 
-    const bollingerPosition = this.getBollingerPosition(marketData);
-
-    for (const pattern of this.learnedPatterns) {
-      if (this.matchesPattern(marketData, pattern, timeOfDay, bollingerPosition)) {
-        // Higher bonus for more profitable and recent patterns
-        const recencyFactor = Math.max(0.1, 1 - (Date.now() - pattern.lastUsed) / (7 * 24 * 60 * 60 * 1000));
-        return pattern.profitability * 0.2 * recencyFactor;
-      }
+  // 1) Pozitif bonus: winningPatterns
+  for (const p of this.winningPatterns) {
+    if (this.matchesPattern(marketData, p, timeOfDay, bollingerPosition)) {
+      const recency = Math.max(0.1, 1 - (now - p.lastUsed) / (7*24*3600*1000));
+      return +p.profitability * 0.2 * recency;  // örn. +%2
     }
-
-    return 0;
   }
+
+  // 2) Negatif ceza: losingPatterns
+  for (const p of this.losingPatterns) {
+    if (this.matchesPattern(marketData, p, timeOfDay, bollingerPosition)) {
+      const recency = Math.max(0.1, 1 - (now - p.lastUsed) / (7*24*3600*1000));
+      return -Math.abs(p.profitability) * 0.2 * recency; // örn. -%2
+    }
+  }
+
+  return 0;
+}
 
   private getBollingerPosition(marketData: MarketData): string {
     if (!marketData.bollinger) return 'MIDDLE';
@@ -500,7 +506,7 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
   };
 
   // Mevcut benzer bir kayıp örüntüsü var mı?
-  const existingPattern = this.learnedPatterns.find(p => 
+  const existingPattern = this.losingPatterns.find(p => 
     this.patternsAreSimilar(p, pattern) && p.outcome.winRate <= 0.3
   );
 
@@ -517,14 +523,14 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
     existingPattern.lastUsed = Date.now();
     existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
   } else {
-    this.learnedPatterns.push(pattern);
+    this.losingPatterns.push(pattern);
     console.log(`⚠️ New losing pattern recorded: ${trade.symbol} ${trade.side} (${position.pnlPercent.toFixed(2)}%)`);
   }
 
   // En fazla 50 örüntü sakla
-  this.learnedPatterns.sort((a, b) => b.profitability - a.profitability);
-  if (this.learnedPatterns.length > 50) {
-    this.learnedPatterns = this.learnedPatterns.slice(0, 50);
+  this.losingPatterns.sort((a, b) => b.profitability - a.profitability);
+  if (this.losingPatterns.length > 50) {
+    this.losingPatterns = this.losingPatterns.slice(0, 50);
   }
 }
   private learnFromProfitableTrade(trade: Trade, position: Position, marketData: MarketData) {
@@ -569,7 +575,7 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
     profitability: position.pnlPercent / 100
   };
 
-  const existingPattern = this.learnedPatterns.find(p =>
+  const existingPattern = this.winningPatterns.find(p =>
     this.patternsAreSimilar(p, pattern)
   );
 
@@ -588,13 +594,13 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
     existingPattern.lastUsed = Date.now();
     existingPattern.profitability = existingPattern.outcome.avgProfit / 100;
   } else {
-    this.learnedPatterns.push(pattern);
+    this.winningPatterns.push(pattern);
     console.log(`🧠 New profitable pattern learned: ${trade.symbol} ${trade.side} (+${position.pnlPercent.toFixed(2)}%)`);
   }
 
   // Keep only top 50 patterns
-  this.learnedPatterns.sort((a, b) => b.profitability - a.profitability);
-  this.learnedPatterns = this.learnedPatterns.slice(0, 50);
+  this.winningPatterns.sort((a, b) => b.profitability - a.profitability);
+  this.winningPatterns = this.winningPatterns.slice(0, 50);
 }
 
   private patternsAreSimilar(p1: TradePattern, p2: TradePattern): boolean {
@@ -763,6 +769,8 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
     try {
       localStorage.setItem('adaptive-strategy-patterns', JSON.stringify(this.learnedPatterns));
       localStorage.setItem('adaptive-strategy-risk', JSON.stringify(this.riskMetrics));
+      localStorage.setItem('adaptive-winning-patterns', JSON.stringify(this.winningPatterns));
+      localStorage.setItem('adaptive-losing-patterns',  JSON.stringify(this.losingPatterns));
       localStorage.setItem('adaptive-strategy-trades', JSON.stringify(this.recentTrades));
       localStorage.setItem('adaptive-strategy-reflections', JSON.stringify(this.tradeReflections));
     } catch (error) {
@@ -784,6 +792,10 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
 
       const reflections = localStorage.getItem('adaptive-strategy-reflections');
       if (reflections) this.tradeReflections = JSON.parse(reflections);
+       const wp = localStorage.getItem('adaptive-winning-patterns');
+  if (wp) this.winningPatterns = JSON.parse(wp);
+  const lp = localStorage.getItem('adaptive-losing-patterns');
+  if (lp) this.losingPatterns = JSON.parse(lp);
 
       console.log(`🧠 Loaded ${this.learnedPatterns.length} learned patterns, win rate: ${(this.riskMetrics.recentWinRate * 100).toFixed(1)}%`);
     } catch (error) {
@@ -794,6 +806,8 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
   try {
     const payload = {
       patterns: this.learnedPatterns,
+      winningPatterns: this.winningPatterns,
+      losingPatterns:  this.losingPatterns,
       riskMetrics: this.riskMetrics,
       recentTrades: this.recentTrades,
       tradeReflections: this.tradeReflections
@@ -817,12 +831,13 @@ private async loadAdaptiveDataFromMongo() {
     const response = await fetch('http://localhost:4000/api/adaptive/get');
     const data = await response.json();
 
-    this.learnedPatterns = data.patterns || [];
-    this.riskMetrics = data.riskMetrics || {};
-    this.recentTrades = data.recentTrades || [];
-    this.tradeReflections = data.tradeReflections || [];
+    this.winningPatterns = data.winningPatterns || [];
+    this.losingPatterns  = data.losingPatterns  || [];
+    this.riskMetrics     = data.riskMetrics     || this.riskMetrics;
+    this.recentTrades    = data.recentTrades    || [];
+    this.tradeReflections= data.tradeReflections|| [];
 
-    console.log(`📦 Adaptive strateji MongoDB'den yüklendi.`);
+    console.log(`📦 Adaptive strateji MongoDB'den yüklendi. Wins: ${this.winningPatterns.length}, Losses: ${this.losingPatterns.length}`);
   } catch (error) {
     console.error('❌ Mongo adaptive load hatası:', error);
   }
@@ -830,22 +845,22 @@ private async loadAdaptiveDataFromMongo() {
   downloadAdaptiveDataAsJson() {
   try {
     const data = {
-      patterns: this.learnedPatterns,
-      riskMetrics: this.riskMetrics,
-      recentTrades: this.recentTrades,
-      tradeReflections: this.tradeReflections,
-      exportedAt: new Date().toISOString()
+      exportedAt:        new Date().toISOString(),
+      winningPatterns:   this.winningPatterns,
+      losingPatterns:    this.losingPatterns,
+      riskMetrics:       this.riskMetrics,
+      recentTrades:      this.recentTrades,
+      tradeReflections:  this.tradeReflections
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = 'adaptive_data_backup.json';
     a.click();
-
     URL.revokeObjectURL(url);
+
     console.log('✅ Adaptive strategy yedeği indirildi.');
   } catch (error) {
     console.error('❌ Adaptive verisi indirme hatası:', error);
@@ -857,6 +872,8 @@ private async loadAdaptiveDataFromMongo() {
     
     // Reset learned patterns
     this.learnedPatterns = [];
+    this.winningPatterns = [];
+    this.losingPatterns  = [];
     
     // Reset risk metrics to defaults completely
     this.riskMetrics = {
