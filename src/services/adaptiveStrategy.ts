@@ -368,7 +368,8 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
   marketData: MarketData,
   confidenceThreshold: number = 0.8,
   positionType: 'SPOT' | 'LONG' | 'SHORT' = 'SPOT',
-  leverage: number = 1
+  leverage: number = 1,
+  minFutConf:number = 0.5
 ): { shouldTrade: boolean; reason: string; confidence: number; strategy: TradingStrategy } {
     // Check cooldown
     if (Date.now() < this.riskMetrics.lastCooldownEnd) {
@@ -384,7 +385,7 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
     const strategy = this.selectOptimalStrategy(marketCondition,leverage);
     const confidence = this.calculateSignalConfidence(marketData, marketCondition, confidenceThreshold);
      // Kaldıraçlı (futures) işlemlerde minimum güven eşiğini yükselt
-  if (positionType !== 'SPOT' && confidence < 0.6) {
+  if (positionType !== 'SPOT' && confidence < minFutConf) {
     return {
       shouldTrade: false,
       reason: 'Too risky with leverage',
