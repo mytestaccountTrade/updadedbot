@@ -385,10 +385,11 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
     const strategy = this.selectOptimalStrategy(marketCondition,leverage);
     const confidence = this.calculateSignalConfidence(marketData, marketCondition, confidenceThreshold);
      // Kaldıraçlı (futures) işlemlerde minimum güven eşiğini yükselt
-  if (positionType !== 'SPOT' && confidence < minFutConf) {
+   const futThreshold = Math.max(confidenceThreshold, minFutConf);
+  if (positionType !== 'SPOT' && confidence < futThreshold) {
     return {
       shouldTrade: false,
-      reason: 'Too risky with leverage',
+      reason: `Futures confidence ${confidence.toFixed(2)} < threshold ${futThreshold.toFixed(2)}`,
       confidence,
       strategy
     };
