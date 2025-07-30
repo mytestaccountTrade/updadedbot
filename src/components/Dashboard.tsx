@@ -88,12 +88,16 @@ export const Dashboard: React.FC = () => {
     const adaptiveRisk = adaptiveStrategy.getRiskMetrics();
     const patterns = adaptiveStrategy.getLearnedPatterns();
     const reflections = adaptiveStrategy.getRecentReflections();
+    const winnerPattern = adaptiveStrategy.getWinningPatterns();
+    const losePattern = adaptiveStrategy.getLosePatterns();
     
     setAdaptiveStats({
       riskLevel: (adaptiveRisk.currentRiskLevel * 100).toFixed(0),
       winRate: (adaptiveRisk.recentWinRate * 100).toFixed(1),
       consecutiveLosses: adaptiveRisk.consecutiveLosses,
       learnedPatterns: patterns.length,
+      winPatterns: winnerPattern.length,
+      loserPatterns: losePattern.length,
       lastReflection: reflections.length > 0 ? reflections[reflections.length - 1].reflection : 'No reflections yet',
       inCooldown: Date.now() < adaptiveRisk.lastCooldownEnd
     });
@@ -354,8 +358,12 @@ export const Dashboard: React.FC = () => {
                         <div className="font-medium">{adaptiveStats.consecutiveLosses}</div>
                       </div>
                       <div>
-                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Learned Patterns:</span>
-                        <div className="font-medium">{adaptiveStats.learnedPatterns}</div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Winner Patterns:</span>
+                        <div className="font-medium">{adaptiveStats.winPatterns}</div>
+                      </div>
+                      <div>
+                        <span className={adaptiveStats.inCooldown ? 'text-red-600' : 'text-green-600'}>Loser Patterns:</span>
+                        <div className="font-medium">{adaptiveStats.loserPatterns}</div>
                       </div>
                     </div>
                     <div className="text-xs">
