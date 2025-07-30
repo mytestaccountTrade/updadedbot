@@ -759,6 +759,12 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
   getLearnedPatterns(): TradePattern[] {
     return [...this.learnedPatterns];
   }
+  getWinningPatterns(): TradePattern[] {
+    return [...this.winningPatterns];
+  }
+  getLosePatterns(): TradePattern[] {
+    return [...this.losingPatterns];
+  }
 
   getRecentReflections(): Array<{ timestamp: number; reflection: string; trade: any }> {
     return [...this.tradeReflections];
