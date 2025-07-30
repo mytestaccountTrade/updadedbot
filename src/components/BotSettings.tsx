@@ -387,6 +387,33 @@ export const BotSettings: React.FC<BotSettingsProps> = ({ config, onSave, onClos
               </div>
             </div>
             
+            {/* Futures Confidence Threshold Slider */}
+            {formData.tradeMode === 'futures' && ( 
+            <div className="p-4 rounded-lg border-2 border-gray-300">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('minFuturesConfidence')} ({(formData.minFuturesConfidence * 100).toFixed(0)}%)
+                </label>
+                <div className="text-sm text-gray-600 mb-3">
+                  {t('minFuturesConfidenceDescription')}
+                </div>
+                <input
+                  type="range"
+                  min="0.10"
+                  max="0.95"
+                  step="0.01"
+                  value={formData.minFuturesConfidence}
+                  onChange={(e) => handleChange('minFuturesConfidence', parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>10%</span>
+                  <span>95%</span>
+                </div>
+              </div>
+            </div>
+             )}
+            
             {/* Reset AI Learning */}
             <div className="p-4 rounded-lg border-2 border-gray-300">
               <div className="mb-4">
