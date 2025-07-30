@@ -305,10 +305,16 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
   weight += patternBonus > 0 ? 0.6 : 0;
 
   // Normalize confidence
-  let confidence = weight > 0 ? Math.max(0, Math.min(score / weight, 1)) : 0.5;
+  // normalize confidence
+let confidence = weight > 0 ? Math.max(0, Math.min(score / weight, 1)) : 0.5;
 
-  // Market condition etkisi
+// marketCondition.confidence default’unu 1 yap veya sadece >0’sa çarp
+if (marketCondition.confidence > 0) {
   confidence *= marketCondition.confidence;
+}
+
+// alt eşiği koru
+confidence = Math.max(0.05, confidence);
 
   return Number(confidence.toFixed(3));
 }
