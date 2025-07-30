@@ -408,10 +408,6 @@ confidence = Math.max(0.05, confidence);
   // Time of day
   if (c.timeOfDay && timeOfDay !== c.timeOfDay) return false;
 
-  // Market trend (yeni eklenebilecek)
-  if ((c as any).marketTrend && marketData.marketTrend !== (c as any).marketTrend)
-    return false;
-
   return true;
 }
 
