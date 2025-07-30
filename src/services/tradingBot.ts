@@ -688,7 +688,7 @@ if (!matchedTrade) {
 
         const signal = await newsService.generateTradingSignal(pair.symbol, marketData, news);
         const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
-
+        console.log(`   🎯 Enhanced signal:`, enhancedSignal);
         const leverage = this.config.leverage ?? 1;
         const positionType = this.config.tradeMode === 'futures'
           ? (enhancedSignal.action === 'BUY' ? 'LONG' : 'SHORT')
@@ -707,8 +707,11 @@ if (!matchedTrade) {
               confidence: 0.7,
               strategy: { entryThreshold: 0.6, riskMultiplier: 1.0 },
             };
-
-        if (!adaptiveDecision.shouldTrade) return;
+         console.log(`   🤖 adaptiveDecision for ${pair.symbol}:`, adaptiveDecision);
+        if (!adaptiveDecision.shouldTrade) {
+        console.log(`   ⚠️ tradeBlocked by adaptive: ${adaptiveDecision.reason}`);
+        return;
+      }
 
         const finalConfidence = this.config.adaptiveStrategyEnabled
           ? (enhancedSignal.confidence + adaptiveDecision.confidence) / 2
