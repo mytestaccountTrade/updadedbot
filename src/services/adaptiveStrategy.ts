@@ -316,7 +316,7 @@ adjustedStrategy.riskMultiplier *= leverageReduction;
   private getPatternMatchBonus(marketData: MarketData): number {
   const now = Date.now();
   const hour = new Date().getUTCHours();
-  const timeOfDay = /* … */; 
+  const timeOfDay = 'OVERNIGHT'; 
   const bollingerPosition = this.getBollingerPosition(marketData);
 
   // 1) Pozitif bonus: winningPatterns
