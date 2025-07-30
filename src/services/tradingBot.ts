@@ -343,6 +343,7 @@ class TradingBot {
     const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
 
     const leverage = this.config.leverage ?? 1;
+    const minFutConf = this.config.minFuturesConfidence?? 0.5;
     const positionType = this.config.tradeMode === 'futures'
       ? (enhancedSignal.action === 'BUY' ? 'LONG' : 'SHORT')
       : 'SPOT';
@@ -352,7 +353,8 @@ class TradingBot {
           marketData,
           this.config.confidenceThreshold,
           positionType,
-          leverage
+          leverage,
+        minFutConf
         )
       : {
           shouldTrade: true,
@@ -692,6 +694,7 @@ if (!matchedTrade) {
         const enhancedSignal = await learningService.enhanceSignal(signal, marketData, learningInsights);
         console.log(`   🎯 Enhanced signal:`, enhancedSignal);
         const leverage = this.config.leverage ?? 1;
+        const minFutConf = this.config.minFuturesConfidence?? 0.5;
         const positionType = this.config.tradeMode === 'futures'
           ? (enhancedSignal.action === 'BUY' ? 'LONG' : 'SHORT')
           : 'SPOT';
@@ -701,7 +704,8 @@ if (!matchedTrade) {
               marketData,
               this.config.confidenceThreshold,
               positionType,
-              leverage
+              leverage,
+              minFutConf
             )
           : {
               shouldTrade: true,
