@@ -319,33 +319,42 @@ confidence = Math.max(0.05, confidence);
   return Number(confidence.toFixed(3));
 }
 
-  private getPatternMatchBonus(marketData: MarketData): number {
+ private getPatternMatchBonus(marketData: MarketData): number {
   const now = Date.now();
-   const hour = new Date().getUTCHours();
-    let timeOfDay: string;
-    if (hour >= 0 && hour < 6) timeOfDay = 'ASIAN';
-    else if (hour >= 6 && hour < 14) timeOfDay = 'EUROPEAN';
-    else if (hour >= 14 && hour < 22) timeOfDay = 'AMERICAN';
-    else timeOfDay = 'OVERNIGHT';
+  const hour = new Date(now).getUTCHours();
+  let timeOfDay: string;
+  if (hour < 6) timeOfDay = 'ASIAN';
+  else if (hour < 14) timeOfDay = 'EUROPEAN';
+  else if (hour < 22) timeOfDay = 'AMERICAN';
+  else timeOfDay = 'OVERNIGHT';
+
   const bollingerPosition = this.getBollingerPosition(marketData);
 
-  // 1) Pozitif bonus: winningPatterns
+  let bestBonus = 0;
   for (const p of this.winningPatterns) {
     if (this.matchesPattern(marketData, p, timeOfDay, bollingerPosition)) {
-      const recency = Math.max(0.1, 1 - (now - p.lastUsed) / (7*24*3600*1000));
-      return +p.profitability * 0.2 * recency;  // örn. +%2
+      const recency = Math.max(
+        0.1,
+        1 - (now - p.lastUsed) / (7 * 24 * 60 * 60 * 1000)
+      );
+      const bonus = p.profitability * 0.2 * recency;
+      bestBonus = Math.max(bestBonus, bonus);
     }
   }
+  if (bestBonus !== 0) return bestBonus;
 
-  // 2) Negatif ceza: losingPatterns
+  let worstPenalty = 0;
   for (const p of this.losingPatterns) {
     if (this.matchesPattern(marketData, p, timeOfDay, bollingerPosition)) {
-      const recency = Math.max(0.1, 1 - (now - p.lastUsed) / (7*24*3600*1000));
-      return -Math.abs(p.profitability) * 0.2 * recency; // örn. -%2
+      const recency = Math.max(
+        0.1,
+        1 - (now - p.lastUsed) / (7 * 24 * 60 * 60 * 1000)
+      );
+      const penalty = -Math.abs(p.profitability) * 0.2 * recency;
+      worstPenalty = Math.min(worstPenalty, penalty);
     }
   }
-
-  return 0;
+  return worstPenalty;
 }
 
   private getBollingerPosition(marketData: MarketData): string {
@@ -357,18 +366,54 @@ confidence = Math.max(0.05, confidence);
     return 'MIDDLE';
   }
 
-  private matchesPattern(marketData: MarketData, pattern: TradePattern, timeOfDay: string, bollingerPosition: string): boolean {
-    const { conditions } = pattern;
-    
-    return (
-      marketData.rsi >= conditions.rsi.min && marketData.rsi <= conditions.rsi.max &&
-      marketData.macd >= conditions.macd.min && marketData.macd <= conditions.macd.max &&
-      marketData.volumeRatio >= conditions.volumeRatio.min && marketData.volumeRatio <= conditions.volumeRatio.max &&
-      marketData.emaTrend === conditions.emaTrend &&
-      bollingerPosition === conditions.bollingerPosition &&
-      timeOfDay === conditions.timeOfDay
-    );
+  private matchesPattern(
+  marketData: MarketData,
+  pattern: TradePattern,
+  timeOfDay: string,
+  bollingerPosition: string
+): boolean {
+  const c = pattern.conditions;
+
+  // RSI
+  if (c.rsi) {
+    if (
+      marketData.rsi < (c.rsi.min ?? -Infinity) ||
+      marketData.rsi > (c.rsi.max ?? Infinity)
+    ) return false;
   }
+
+  // MACD
+  if (c.macd) {
+    if (
+      marketData.macd < (c.macd.min ?? -Infinity) ||
+      marketData.macd > (c.macd.max ?? Infinity)
+    ) return false;
+  }
+
+  // VolumeRatio
+  if (c.volumeRatio) {
+    if (
+      marketData.volumeRatio < (c.volumeRatio.min ?? -Infinity) ||
+      marketData.volumeRatio > (c.volumeRatio.max ?? Infinity)
+    ) return false;
+  }
+
+  // EMA trend
+  if (c.emaTrend && marketData.emaTrend !== c.emaTrend) return false;
+
+  // Bollinger pozisyonu
+  if (c.bollingerPosition && bollingerPosition !== c.bollingerPosition)
+    return false;
+
+  // Time of day
+  if (c.timeOfDay && timeOfDay !== c.timeOfDay) return false;
+
+  // Market trend (yeni eklenebilecek)
+  if ((c as any).marketTrend && marketData.marketTrend !== (c as any).marketTrend)
+    return false;
+
+  return true;
+}
 
   shouldTrade(
   marketData: MarketData,
