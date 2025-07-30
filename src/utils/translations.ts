@@ -105,6 +105,8 @@ export const translations = {
     resetAiOnly: 'Reset AI only',
     resetAllBotData: 'Reset All Bot Data (including trade history and stats)',
     confidenceThreshold: 'Confidence Threshold',
+    minFuturesConfidence:'Minimum Futures Confidence Threshold',
+    minFuturesConfidenceDescription:'Minimum confidence required for all futures strategy decisions',
     confidenceThresholdDescription: 'Minimum confidence required for all AI-based trades and adaptive strategy decisions',
     
     // Multi-Strategy Settings
@@ -327,6 +329,8 @@ export const translations = {
     resetAllBotData: 'Tüm Bot Verilerini Sıfırla (ticaret geçmişi ve istatistikler dahil)',
     confidenceThreshold: 'Güven Eşiği',
     confidenceThresholdDescription: 'Tüm AI tabanlı işlemler ve uyarlanabilir strateji kararları için gereken minimum güven seviyesi. Hem AI sinyal üretimi hem de uyarlanabilir strateji filtrelemesi tarafından kullanılır.',
+     minFuturesConfidence:'Futures işlemi Güven Eşiği',
+    minFuturesConfidenceDescription:'Futures işlemleri için strateji kararlarında gereken minimum güven seyisi.',
     
     // Multi-Strategy Settings
     multiStrategySettings: 'Çoklu Strateji Ayarları',
