@@ -583,7 +583,7 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
   // En fazla 50 örüntü sakla
   this.losingPatterns.sort((a, b) => b.profitability - a.profitability);
   if (this.losingPatterns.length > 50) {
-    this.losingPatterns = this.losingPatterns.slice(0, 50);
+    this.losingPatterns = this.losingPatterns.slice(0, 100);
   }
 }
   private learnFromProfitableTrade(trade: Trade, position: Position, marketData: MarketData) {
@@ -653,7 +653,7 @@ private learnFromLosingTrade(trade: Trade, position: Position, marketData: Marke
 
   // Keep only top 50 patterns
   this.winningPatterns.sort((a, b) => b.profitability - a.profitability);
-  this.winningPatterns = this.winningPatterns.slice(0, 50);
+  this.winningPatterns = this.winningPatterns.slice(0, 100);
 }
 
   private patternsAreSimilar(p1: TradePattern, p2: TradePattern): boolean {
